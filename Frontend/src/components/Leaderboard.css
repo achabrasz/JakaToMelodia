@@ -1,0 +1,154 @@
+﻿.leaderboard {
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.leaderboard h1 {
+  margin-top: 0;
+  font-size: 2.5rem;
+  color: #333;
+  animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.winner-section {
+  margin: 40px 0;
+}
+
+.winner-section h2 {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.winner-card {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(255, 215, 0, 0.3);
+  animation: scaleIn 0.5s ease-out 0.2s both;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.trophy {
+  font-size: 4rem;
+  margin-bottom: 10px;
+}
+
+.winner-card h3 {
+  font-size: 2rem;
+  margin: 10px 0;
+  color: #333;
+}
+
+.winner-score {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #555;
+  margin: 0;
+}
+
+.final-rankings {
+  margin: 40px 0;
+  background: #f5f5f5;
+  padding: 25px;
+  border-radius: 12px;
+}
+
+.final-rankings h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.ranking-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  transition: transform 0.2s;
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+.ranking-row:nth-child(1) { animation-delay: 0.1s; }
+.ranking-row:nth-child(2) { animation-delay: 0.2s; }
+.ranking-row:nth-child(3) { animation-delay: 0.3s; }
+.ranking-row:nth-child(4) { animation-delay: 0.4s; }
+.ranking-row:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ranking-row.first {
+  background: linear-gradient(135deg, #fff9e6 0%, #fffbf0 100%);
+  border: 2px solid #ffd700;
+}
+
+.position {
+  font-size: 1.5rem;
+  min-width: 50px;
+  font-weight: 700;
+}
+
+.ranking-row .player-name {
+  flex: 1;
+  text-align: left;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.ranking-row .score {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #667eea;
+}
+
+.play-again-button {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 30px;
+  transition: all 0.3s;
+}
+
+.play-again-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
