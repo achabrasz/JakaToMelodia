@@ -1,12 +1,14 @@
 ﻿import { useState } from 'react';
 import { signalRService } from '../services/signalRService';
+import { MusicSource } from '../types';
 import './PlaylistInput.css';
 
 interface PlaylistInputProps {
   isLoading: boolean;
+  musicSource: MusicSource;
 }
 
-export const PlaylistInput = ({ isLoading }: PlaylistInputProps) => {
+export const PlaylistInput = ({ isLoading, musicSource }: PlaylistInputProps) => {
   const [playlistUrl, setPlaylistUrl] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -17,13 +19,34 @@ export const PlaylistInput = ({ isLoading }: PlaylistInputProps) => {
     setPlaylistUrl('');
   };
 
+  const getPlaceholder = () => {
+    if (musicSource === MusicSource.Spotify) {
+      return 'Wklej link do playlisty Spotify...';
+    }
+    return 'Wklej link do playlisty YouTube...';
+  };
+
+  const getTitle = () => {
+    if (musicSource === MusicSource.Spotify) {
+      return 'Dodaj playlistę Spotify';
+    }
+    return 'Dodaj playlistę YouTube';
+  };
+
+  const getHint = () => {
+    if (musicSource === MusicSource.Spotify) {
+      return 'Skopiuj link do playlisty Spotify (np. https://open.spotify.com/playlist/...)';
+    }
+    return 'Skopiuj link do playlisty YouTube (np. https://www.youtube.com/playlist?list=...)';
+  };
+
   return (
     <div className="playlist-input">
-      <h3>Dodaj playlistę Spotify</h3>
+      <h3>{getTitle()}</h3>
       <form onSubmit={handleSubmit}>
         <input
           type="text"
-          placeholder="Wklej link do playlisty Spotify..."
+          placeholder={getPlaceholder()}
           value={playlistUrl}
           onChange={(e) => setPlaylistUrl(e.target.value)}
           disabled={isLoading}
@@ -38,7 +61,7 @@ export const PlaylistInput = ({ isLoading }: PlaylistInputProps) => {
         </button>
       </form>
       <p className="hint">
-        Skopiuj link do playlisty Spotify (np. https://open.spotify.com/playlist/...)
+        {getHint()}
       </p>
     </div>
   );

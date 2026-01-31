@@ -26,10 +26,16 @@ builder.Services.AddCors(options =>
 
 // Add application services
 builder.Services.AddSingleton<IGameService, GameService>();
-builder.Services.AddSingleton<ISpotifyService, SpotifyService>();
 
-// Configure Spotify settings
-builder.Services.Configure<SpotifySettings>(builder.Configuration.GetSection("Spotify"));
+// Use Mock Spotify Service (no API keys needed for development)
+builder.Services.AddSingleton<ISpotifyService, MockSpotifyService>();
+
+// Add YouTube service
+builder.Services.AddHttpClient<IYouTubeService, YouTubeService>();
+
+// For production with real Spotify API, uncomment this line and configure appsettings:
+// builder.Services.AddSingleton<ISpotifyService, SpotifyService>();
+// builder.Services.Configure<SpotifySettings>(builder.Configuration.GetSection("Spotify"));
 
 var app = builder.Build();
 

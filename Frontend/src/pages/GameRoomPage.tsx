@@ -2,8 +2,10 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { signalRService } from '../services/signalRService';
 import { spotifyService } from '../services/spotifyService';
+import { youtubeService } from '../services/youtubeService';
 import { useGameStore } from '../store/gameStore';
-import { GameState, RoundData, RoundEndData, Song } from '../types';
+import type { RoundData, RoundEndData, Song } from '../types';
+import { GameState, MusicSource } from '../types';
 import { PlayerList } from '../components/PlayerList';
 import { PlaylistInput } from '../components/PlaylistInput';
 import { GamePlay } from '../components/GamePlay';
@@ -35,7 +37,12 @@ export const GameRoomPage = () => {
     signalRService.on('PlaylistId', async (playlistId: string) => {
       setIsLoadingPlaylist(true);
       try {
-        const songs = await spotifyService.getPlaylistTracks(playlistId);
+        let songs: Song[];
+        if (room?.musicSource === MusicSource.YouTube) {
+          songs = await youtubeService.getPlaylistTracks(playlistId);
+        } else {
+          songs = await spotifyService.getPlaylistTracks(playlistId);
+        }
         await signalRService.playlistLoaded(songs);
       } catch (error) {
         console.error('Failed to load playlist:', error);
@@ -159,7 +166,10 @@ export const GameRoomPage = () => {
               
               {isHost && (
                 <>
-                  <PlaylistInput isLoading={isLoadingPlaylist} />
+                  <PlaylistInput 
+                    isLoading={isLoadingPlaylist} 
+                    musicSource={room.musicSource}
+                  />
                   
                   {room.playlist.length > 0 && (
                     <div className="playlist-info">

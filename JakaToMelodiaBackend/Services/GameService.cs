@@ -4,7 +4,7 @@ namespace JakaToMelodiaBackend.Services;
 
 public interface IGameService
 {
-    GameRoom CreateRoom();
+    GameRoom CreateRoom(MusicSource musicSource = MusicSource.Spotify);
     GameRoom? GetRoom(string roomCode);
     bool JoinRoom(string roomCode, Player player);
     bool LeaveRoom(string roomCode, string playerId);
@@ -23,11 +23,12 @@ public class GameService : IGameService
     private const int TitlePoints = 100;
     private const int ArtistPoints = 50;
 
-    public GameRoom CreateRoom()
+    public GameRoom CreateRoom(MusicSource musicSource = MusicSource.Spotify)
     {
         var room = new GameRoom
         {
-            RoomCode = GenerateRoomCode()
+            RoomCode = GenerateRoomCode(),
+            MusicSource = musicSource
         };
         _rooms[room.RoomCode] = room;
         return room;

@@ -2,17 +2,22 @@
 import { useNavigate } from 'react-router-dom';
 import { signalRService } from '../services/signalRService';
 import { useGameStore } from '../store/gameStore';
+import { generateId } from '../utils/helpers';
+import { MusicSource } from '../types';
 import './HomePage.css';
 
 export const HomePage = () => {
+  console.log('🏠 HomePage rendering...');
+  
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState('');
+  const [selectedMusicSource, setSelectedMusicSource] = useState<MusicSource>(MusicSource.Spotify);
   
   const navigate = useNavigate();
-  const setCurrentPlayer = useGameStore(state => state.setCurrentPlayer);
+  const { setCurrentPlayer, setMusicSource } = useGameStore();
 
   const handleCreateRoom = async () => {
     if (!playerName.trim()) {
@@ -25,15 +30,17 @@ export const HomePage = () => {
 
     try {
       await signalRService.connect();
-      const code = await signalRService.createRoom(playerName);
+      const code = await signalRService.createRoom(playerName, selectedMusicSource);
       
       setCurrentPlayer({
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: playerName,
         connectionId: '',
         score: 0,
         isHost: true
       });
+      
+      setMusicSource(selectedMusicSource);
 
       navigate(`/room/${code}`);
     } catch (err) {
@@ -63,7 +70,7 @@ export const HomePage = () => {
       
       if (success) {
         setCurrentPlayer({
-          id: crypto.randomUUID(),
+          id: generateId(),
           name: playerName,
           connectionId: '',
           score: 0,
@@ -86,7 +93,25 @@ export const HomePage = () => {
     <div className="home-page">
       <div className="home-container">
         <h1 className="title">🎵 Jaka To Melodia</h1>
-        <p className="subtitle">Gra muzyczna ze Spotify</p>
+        <p className="subtitle">Gra muzyczna ze Spotify lub YouTube</p>
+
+        <div className="music-source-selector">
+          <label>Wybierz źródło muzyki:</label>
+          <div className="source-buttons">
+            <button
+              className={`source-button ${selectedMusicSource === MusicSource.Spotify ? 'active' : ''}`}
+              onClick={() => setSelectedMusicSource(MusicSource.Spotify)}
+            >
+              🎵 Spotify
+            </button>
+            <button
+              className={`source-button ${selectedMusicSource === MusicSource.YouTube ? 'active' : ''}`}
+              onClick={() => setSelectedMusicSource(MusicSource.YouTube)}
+            >
+              📺 YouTube
+            </button>
+          </div>
+        </div>
 
         <div className="input-section">
           <input
@@ -95,6 +120,7 @@ export const HomePage = () => {
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
             className="input"
+          />
           />
         </div>
 

@@ -1,5 +1,6 @@
 ﻿import * as signalR from '@microsoft/signalr';
-import { Song, Player, GameRoom, GuessResult } from '../types';
+import type { Song } from '../types';
+import { MusicSource } from '../types';
 
 class SignalRService {
   private connection: signalR.HubConnection | null = null;
@@ -22,9 +23,9 @@ class SignalRService {
     }
   }
 
-  async createRoom(playerName: string): Promise<string> {
+  async createRoom(playerName: string, musicSource: MusicSource = MusicSource.Spotify): Promise<string> {
     if (!this.connection) throw new Error('Not connected');
-    this.roomCode = await this.connection.invoke('CreateRoom', playerName);
+    this.roomCode = await this.connection.invoke('CreateRoom', playerName, musicSource);
     return this.roomCode;
   }
 
@@ -74,7 +75,11 @@ class SignalRService {
   }
 
   off(eventName: string, callback?: (...args: any[]) => void): void {
-    this.connection?.off(eventName, callback);
+    if (callback) {
+      this.connection?.off(eventName, callback);
+    } else {
+      this.connection?.off(eventName);
+    }
   }
 
   isConnected(): boolean {

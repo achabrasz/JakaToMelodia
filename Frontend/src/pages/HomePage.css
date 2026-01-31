@@ -1,4 +1,4 @@
-﻿.home-page {
+﻿﻿.home-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -27,6 +27,47 @@
   text-align: center;
   color: #666;
   margin: 0 0 30px 0;
+}
+
+.music-source-selector {
+  margin-bottom: 30px;
+}
+
+.music-source-selector label {
+  display: block;
+  text-align: center;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.source-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.source-button {
+  flex: 1;
+  padding: 12px 20px;
+  font-size: 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.source-button:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+}
+
+.source-button.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
 .input-section {

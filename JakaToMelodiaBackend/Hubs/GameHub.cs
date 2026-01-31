@@ -13,9 +13,9 @@ public class GameHub : Hub
         _gameService = gameService;
     }
 
-    public async Task<string> CreateRoom(string playerName)
+    public async Task<string> CreateRoom(string playerName, MusicSource musicSource = MusicSource.Spotify)
     {
-        var room = _gameService.CreateRoom();
+        var room = _gameService.CreateRoom(musicSource);
         var player = new Player
         {
             Name = playerName,
