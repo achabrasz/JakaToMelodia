@@ -1,23 +1,52 @@
-﻿import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { signalRService } from '../services/signalRService';
 import { useGameStore } from '../store/gameStore';
 import { generateId } from '../utils/helpers';
-import { MusicSource } from '../types';
+import type { MusicSource } from '../types';
+import { MusicSourceValues } from '../types';
 import './HomePage.css';
 
 export const HomePage = () => {
-  console.log('🏠 HomePage rendering...');
-  
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState('');
-  const [selectedMusicSource, setSelectedMusicSource] = useState<MusicSource>(MusicSource.Spotify);
-  
+  const [selectedMusicSource, setSelectedMusicSource] = useState<MusicSource>(MusicSourceValues.Spotify);
+  const [spotifyAuthed, setSpotifyAuthed] = useState<boolean | null>(null);
+  const [spotifyRedirectUri, setSpotifyRedirectUri] = useState<string>('');
+
   const navigate = useNavigate();
-  const { setCurrentPlayer, setMusicSource } = useGameStore();
+  const [searchParams] = useSearchParams();
+  const setCurrentPlayer = useGameStore((s) => s.setCurrentPlayer);
+  const setMusicSource = useGameStore((s) => s.setMusicSource);
+
+  // Check Spotify auth status on mount (and after redirect back from Spotify)
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const resp = await fetch('/api/spotify/status');
+        const data = await resp.json();
+        setSpotifyAuthed(data.authenticated);
+        if (data.redirectUri) setSpotifyRedirectUri(data.redirectUri);
+      } catch {
+        setSpotifyAuthed(false);
+      }
+    };
+    checkAuth();
+
+    if (searchParams.get('spotify') === 'authenticated') {
+      // Clean up the URL param
+      window.history.replaceState({}, '', '/');
+    }
+  }, [searchParams]);
+
+  const handleSpotifyLogin = async () => {
+    const resp = await fetch('/api/spotify/auth');
+    const data = await resp.json();
+    window.location.href = data.url;
+  };
 
   const handleCreateRoom = async () => {
     if (!playerName.trim()) {
@@ -99,14 +128,14 @@ export const HomePage = () => {
           <label>Wybierz źródło muzyki:</label>
           <div className="source-buttons">
             <button
-              className={`source-button ${selectedMusicSource === MusicSource.Spotify ? 'active' : ''}`}
-              onClick={() => setSelectedMusicSource(MusicSource.Spotify)}
+              className={`source-button ${selectedMusicSource === MusicSourceValues.Spotify ? 'active' : ''}`}
+              onClick={() => setSelectedMusicSource(MusicSourceValues.Spotify)}
             >
               🎵 Spotify
             </button>
             <button
-              className={`source-button ${selectedMusicSource === MusicSource.YouTube ? 'active' : ''}`}
-              onClick={() => setSelectedMusicSource(MusicSource.YouTube)}
+              className={`source-button ${selectedMusicSource === MusicSourceValues.YouTube ? 'active' : ''}`}
+              onClick={() => setSelectedMusicSource(MusicSourceValues.YouTube)}
             >
               📺 YouTube
             </button>
@@ -121,9 +150,7 @@ export const HomePage = () => {
             onChange={(e) => setPlayerName(e.target.value)}
             className="input"
           />
-          />
         </div>
-
         {error && <div className="error">{error}</div>}
 
         <div className="actions">
@@ -154,6 +181,26 @@ export const HomePage = () => {
               {isJoining ? 'Dołączanie...' : 'Dołącz do pokoju'}
             </button>
           </div>
+        </div>
+
+        <div className="spotify-auth">
+          {spotifyAuthed === false && (
+            <div className="spotify-auth-container">
+              <span className="spotify-auth-text">Zaloguj się do Spotify, aby używać playlist:</span>
+              <button
+                onClick={handleSpotifyLogin}
+                className="button button-spotify"
+              >
+                Zaloguj się przez Spotify
+              </button>
+              {spotifyRedirectUri && (
+                <span className="spotify-auth-uri">
+                  Redirect URI: <code>{spotifyRedirectUri}</code><br/>
+                  ⚠️ Musi być dodany w <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">Spotify Dashboard</a>
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

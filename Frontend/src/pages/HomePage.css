@@ -150,3 +150,56 @@
   flex-direction: column;
   gap: 10px;
 }
+
+.spotify-auth {
+  margin-top: 24px;
+}
+
+.spotify-auth-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f0faf0;
+  border: 1px solid #1db95440;
+  border-radius: 10px;
+}
+
+.spotify-auth-text {
+  font-size: 0.9rem;
+  color: #555;
+  text-align: center;
+}
+
+.spotify-auth-uri {
+  font-size: 0.75rem;
+  color: #777;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.spotify-auth-uri code {
+  background: #eee;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.button-spotify {
+  background: #1db954;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+}
+
+.button-spotify:hover:not(:disabled) {
+  background: #17a349;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(29, 185, 84, 0.4);
+}
+

@@ -17,7 +17,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // Vite default port
+        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -27,15 +27,14 @@ builder.Services.AddCors(options =>
 // Add application services
 builder.Services.AddSingleton<IGameService, GameService>();
 
-// Use Mock Spotify Service (no API keys needed for development)
-builder.Services.AddSingleton<ISpotifyService, MockSpotifyService>();
+// Configure Spotify settings and use real Spotify service
+builder.Services.Configure<SpotifySettings>(builder.Configuration.GetSection("Spotify"));
+builder.Services.AddHttpClient("Spotify");
+builder.Services.AddSingleton<ISpotifyService, SpotifyService>();
 
 // Add YouTube service
 builder.Services.AddHttpClient<IYouTubeService, YouTubeService>();
 
-// For production with real Spotify API, uncomment this line and configure appsettings:
-// builder.Services.AddSingleton<ISpotifyService, SpotifyService>();
-// builder.Services.Configure<SpotifySettings>(builder.Configuration.GetSection("Spotify"));
 
 var app = builder.Build();
 

@@ -64,3 +64,19 @@
   color: #666;
   font-style: italic;
 }
+
+.playlist-url-input--error {
+  border-color: #e53935;
+}
+
+.playlist-error {
+  margin: 10px 0 0 0;
+  padding: 10px 14px;
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 6px;
+  color: #c62828;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+

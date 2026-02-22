@@ -1,5 +1,6 @@
 ﻿import { create } from 'zustand';
-import { GameRoom, Player, MusicSource } from '../types';
+import type { GameRoom, Player, MusicSource } from '../types';
+import { MusicSourceValues } from '../types';
 
 interface GameStore {
   room: GameRoom | null;
@@ -19,7 +20,7 @@ export const useGameStore = create<GameStore>((set) => ({
   room: null,
   currentPlayer: null,
   isConnected: false,
-  musicSource: MusicSource.Spotify,
+  musicSource: MusicSourceValues.Spotify,
 
   setRoom: (room) => set({ room }),
   

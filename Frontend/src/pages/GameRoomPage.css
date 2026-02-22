@@ -67,36 +67,72 @@
 .lobby h2 {
   margin-top: 0;
   color: #333;
+  font-size: 1.6rem;
+  margin-bottom: 24px;
+}
+
+.waiting-text {
+  color: #666;
+  font-size: 1rem;
+  margin-top: 32px;
 }
 
 .playlist-info {
-  margin-top: 20px;
-  padding: 20px;
-  background: #e8f5e9;
-  border-radius: 8px;
+  margin-top: 24px;
+  padding: 28px 24px;
+  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+  border: 2px solid #a5d6a7;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.playlist-info p {
-  margin: 0 0 15px 0;
+.playlist-info-icon {
+  font-size: 2.5rem;
+}
+
+.playlist-info-title {
+  margin: 0;
   color: #2e7d32;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.playlist-info-count {
+  margin: 0;
+  color: #388e3c;
+  font-size: 1rem;
+}
+
+.playlist-info-count strong {
+  font-size: 1.4rem;
+  color: #1b5e20;
 }
 
 .start-button {
-  padding: 14px 32px;
+  margin-top: 8px;
+  padding: 14px 40px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 1.1rem;
-  font-weight: 600;
-  transition: all 0.3s;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: all 0.25s;
+  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.35);
 }
 
 .start-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
+}
+
+.start-button:active {
+  transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {

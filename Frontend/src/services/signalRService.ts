@@ -1,14 +1,19 @@
 ﻿import * as signalR from '@microsoft/signalr';
-import type { Song } from '../types';
-import { MusicSource } from '../types';
+import type { Song, MusicSource } from '../types';
+import { MusicSourceValues } from '../types';
 
 class SignalRService {
   private connection: signalR.HubConnection | null = null;
   private roomCode: string = '';
 
   async connect(): Promise<void> {
+    if (this.connection?.state === signalR.HubConnectionState.Connected ||
+        this.connection?.state === signalR.HubConnectionState.Connecting) {
+      return;
+    }
+
     this.connection = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5000/gameHub')
+      .withUrl('/gameHub')
       .withAutomaticReconnect()
       .build();
 
@@ -23,10 +28,15 @@ class SignalRService {
     }
   }
 
-  async createRoom(playerName: string, musicSource: MusicSource = MusicSource.Spotify): Promise<string> {
+  async createRoom(playerName: string, musicSource: MusicSource = MusicSourceValues.Spotify): Promise<string> {
     if (!this.connection) throw new Error('Not connected');
     this.roomCode = await this.connection.invoke('CreateRoom', playerName, musicSource);
     return this.roomCode;
+  }
+
+  async getRoom(roomCode: string): Promise<any> {
+    if (!this.connection) throw new Error('Not connected');
+    return await this.connection.invoke('GetRoom', roomCode);
   }
 
   async joinRoom(roomCode: string, playerName: string): Promise<boolean> {
@@ -84,6 +94,10 @@ class SignalRService {
 
   isConnected(): boolean {
     return this.connection?.state === signalR.HubConnectionState.Connected;
+  }
+
+  getConnectionId(): string | null {
+    return this.connection?.connectionId ?? null;
   }
 }
 

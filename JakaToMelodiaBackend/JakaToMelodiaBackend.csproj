@@ -9,7 +9,7 @@
 
     <!-- Package references - Updated 2026-01-30 -->
     <ItemGroup>
-        <PackageReference Include="SpotifyAPI.Web" Version="7.2.1" />
+        <PackageReference Include="SpotifyAPI.Web" Version="7.0.0" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.0" />
     </ItemGroup>
 
