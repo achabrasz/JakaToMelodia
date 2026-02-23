@@ -4,7 +4,7 @@ namespace JakaToMelodiaBackend.Services;
 
 public interface IGameService
 {
-    GameRoom CreateRoom();
+    GameRoom CreateRoom(MusicSource musicSource = MusicSource.Spotify);
     GameRoom? GetRoom(string roomCode);
     bool JoinRoom(string roomCode, Player player);
     bool LeaveRoom(string roomCode, string playerId);
@@ -23,11 +23,12 @@ public class GameService : IGameService
     private const int TitlePoints = 100;
     private const int ArtistPoints = 50;
 
-    public GameRoom CreateRoom()
+    public GameRoom CreateRoom(MusicSource musicSource = MusicSource.Spotify)
     {
         var room = new GameRoom
         {
-            RoomCode = GenerateRoomCode()
+            RoomCode = GenerateRoomCode(),
+            MusicSource = musicSource
         };
         _rooms[room.RoomCode] = room;
         return room;
@@ -86,8 +87,9 @@ public class GameService : IGameService
         if (!_rooms.TryGetValue(roomCode, out var room))
             return false;
 
-        // Filter songs that have preview URLs
-        room.Playlist = songs.Where(s => !string.IsNullOrEmpty(s.PreviewUrl)).ToList();
+        // Keep all songs — preview URLs may be empty (Spotify deprecated them);
+        // the frontend uses embedded Spotify player by track ID instead.
+        room.Playlist = songs.ToList();
         return true;
     }
 
@@ -147,16 +149,18 @@ public class GameService : IGameService
             PlayerName = player.Name
         };
 
-        // Check title match
-        if (IsMatch(guess, room.CurrentSong.Title))
+        // Check title match (strip brackets first)
+        var cleanTitle = StripBrackets(room.CurrentSong.Title);
+        if (IsMatch(guess, cleanTitle) || IsMatch(guess, room.CurrentSong.Title))
         {
             result.IsCorrect = true;
             result.Type = GuessType.Title;
             result.PointsAwarded = TitlePoints;
             player.Score += TitlePoints;
         }
-        // Check artist match
-        else if (IsMatch(guess, room.CurrentSong.Artist))
+        // Check artist match — any single artist from the comma-separated list is enough
+        else if (room.CurrentSong.Artist.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                     .Any(a => IsMatch(guess, a.Trim())))
         {
             result.IsCorrect = true;
             result.Type = GuessType.Artist;
@@ -202,6 +206,13 @@ public class GameService : IGameService
         return code;
     }
 
+    private string StripBrackets(string input)
+    {
+        // Remove anything in (), [], {} — e.g. "I Smoked Away My Brain (feat. X)" → "I Smoked Away My Brain"
+        var result = System.Text.RegularExpressions.Regex.Replace(input, @"\s*[\(\[\{][^\)\]\}]*[\)\]\}]", "");
+        return result.Trim();
+    }
+
     private bool IsMatch(string guess, string target)
     {
         if (string.IsNullOrWhiteSpace(guess) || string.IsNullOrWhiteSpace(target))
@@ -217,8 +228,7 @@ public class GameService : IGameService
         // Contains match (for partial answers)
         if (normalizedTarget.Contains(normalizedGuess) || normalizedGuess.Contains(normalizedTarget))
         {
-            // Require at least 60% similarity
-            var similarity = (double)Math.Min(normalizedGuess.Length, normalizedTarget.Length) / 
+            var similarity = (double)Math.Min(normalizedGuess.Length, normalizedTarget.Length) /
                            Math.Max(normalizedGuess.Length, normalizedTarget.Length);
             return similarity >= 0.6;
         }
@@ -228,7 +238,20 @@ public class GameService : IGameService
 
     private string NormalizeString(string input)
     {
-        return input.Trim().ToLowerInvariant()
+        if (string.IsNullOrWhiteSpace(input)) return "";
+
+        // Remove Polish and other diacritics by decomposing to base characters
+        var normalized = input.Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder();
+        foreach (var c in normalized)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                != System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+        }
+        var withoutDiacritics = sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
+
+        return withoutDiacritics.Trim().ToLowerInvariant()
             .Replace("&", "and")
             .Replace("'", "")
             .Replace("\"", "")

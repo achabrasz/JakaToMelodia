@@ -1,4 +1,4 @@
-﻿.home-page {
+﻿﻿.home-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -27,6 +27,47 @@
   text-align: center;
   color: #666;
   margin: 0 0 30px 0;
+}
+
+.music-source-selector {
+  margin-bottom: 30px;
+}
+
+.music-source-selector label {
+  display: block;
+  text-align: center;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.source-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.source-button {
+  flex: 1;
+  padding: 12px 20px;
+  font-size: 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.source-button:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+}
+
+.source-button.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
 .input-section {
@@ -109,3 +150,56 @@
   flex-direction: column;
   gap: 10px;
 }
+
+.spotify-auth {
+  margin-top: 24px;
+}
+
+.spotify-auth-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f0faf0;
+  border: 1px solid #1db95440;
+  border-radius: 10px;
+}
+
+.spotify-auth-text {
+  font-size: 0.9rem;
+  color: #555;
+  text-align: center;
+}
+
+.spotify-auth-uri {
+  font-size: 0.75rem;
+  color: #777;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.spotify-auth-uri code {
+  background: #eee;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.button-spotify {
+  background: #1db954;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+}
+
+.button-spotify:hover:not(:disabled) {
+  background: #17a349;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(29, 185, 84, 0.4);
+}
+

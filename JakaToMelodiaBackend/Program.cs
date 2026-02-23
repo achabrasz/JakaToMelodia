@@ -17,7 +17,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // Vite default port
+        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -26,10 +26,15 @@ builder.Services.AddCors(options =>
 
 // Add application services
 builder.Services.AddSingleton<IGameService, GameService>();
+
+// Configure Spotify settings and use real Spotify service
+builder.Services.Configure<SpotifySettings>(builder.Configuration.GetSection("Spotify"));
+builder.Services.AddHttpClient("Spotify");
 builder.Services.AddSingleton<ISpotifyService, SpotifyService>();
 
-// Configure Spotify settings
-builder.Services.Configure<SpotifySettings>(builder.Configuration.GetSection("Spotify"));
+// Add YouTube service
+builder.Services.AddHttpClient<IYouTubeService, YouTubeService>();
+
 
 var app = builder.Build();
 

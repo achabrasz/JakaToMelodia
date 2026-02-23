@@ -1,9 +1,11 @@
-﻿import { useEffect, useState, useRef } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { signalRService } from '../services/signalRService';
 import { spotifyService } from '../services/spotifyService';
+import { youtubeService } from '../services/youtubeService';
 import { useGameStore } from '../store/gameStore';
-import { GameState, RoundData, RoundEndData, Song } from '../types';
+import type { RoundData, RoundEndData, Song, GameState } from '../types';
+import { GameStateValues, MusicSourceValues } from '../types';
 import { PlayerList } from '../components/PlayerList';
 import { PlaylistInput } from '../components/PlaylistInput';
 import { GamePlay } from '../components/GamePlay';
@@ -13,18 +15,38 @@ import './GameRoomPage.css';
 export const GameRoomPage = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, currentPlayer, setRoom } = useGameStore();
-  const [gameState, setGameState] = useState<GameState>(GameState.Lobby);
+  const { room, currentPlayer, setRoom, setCurrentPlayer } = useGameStore();
+  const [gameState, setGameState] = useState<GameState>(GameStateValues.Lobby);
   const [currentRound, setCurrentRound] = useState<RoundData | null>(null);
   const [roundEndData, setRoundEndData] = useState<RoundEndData | null>(null);
   const [isLoadingPlaylist, setIsLoadingPlaylist] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playlistError, setPlaylistError] = useState<string>('');
+  
+  // Note: audioRef and currentTrackId moved to GamePlay component
 
   useEffect(() => {
     if (!signalRService.isConnected()) {
       navigate('/');
       return;
     }
+
+    // Fetch current room state immediately to avoid missing the RoomUpdated event
+    // that fires right after CreateRoom/JoinRoom (before this effect runs).
+    signalRService.getRoom(roomCode!).then((fetchedRoom) => {
+      if (!fetchedRoom) {
+        navigate('/');
+        return;
+      }
+      setRoom(fetchedRoom);
+      setGameState(fetchedRoom.state);
+
+      // Resolve the current player by connection ID (server assigns the real ID)
+      const connectionId = signalRService.getConnectionId();
+      const me = fetchedRoom.players.find((p: any) => p.connectionId === connectionId);
+      if (me) {
+        setCurrentPlayer(me);
+      }
+    }).catch(() => navigate('/'));
 
     // Set up SignalR event listeners
     signalRService.on('RoomUpdated', (updatedRoom) => {
@@ -34,10 +56,19 @@ export const GameRoomPage = () => {
 
     signalRService.on('PlaylistId', async (playlistId: string) => {
       setIsLoadingPlaylist(true);
+      setPlaylistError('');
       try {
-        const songs = await spotifyService.getPlaylistTracks(playlistId);
+        let songs: Song[];
+        const musicSource = useGameStore.getState().room?.musicSource;
+        if (musicSource === MusicSourceValues.YouTube) {
+          songs = await youtubeService.getPlaylistTracks(playlistId);
+        } else {
+          songs = await spotifyService.getPlaylistTracks(playlistId);
+        }
         await signalRService.playlistLoaded(songs);
       } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Nie udało się załadować playlisty';
+        setPlaylistError(msg);
         console.error('Failed to load playlist:', error);
       } finally {
         setIsLoadingPlaylist(false);
@@ -49,19 +80,13 @@ export const GameRoomPage = () => {
     });
 
     signalRService.on('GameStarted', () => {
-      setGameState(GameState.Playing);
+      setGameState(GameStateValues.Playing);
     });
 
     signalRService.on('RoundStarted', (data: RoundData) => {
       setCurrentRound(data);
       setRoundEndData(null);
-      setGameState(GameState.Playing);
-      
-      // Play audio
-      if (audioRef.current && data.song.previewUrl) {
-        audioRef.current.src = data.song.previewUrl;
-        audioRef.current.play();
-      }
+      setGameState(GameStateValues.Playing);
     });
 
     signalRService.on('CorrectGuess', (data: any) => {
@@ -74,22 +99,11 @@ export const GameRoomPage = () => {
 
     signalRService.on('RoundEnded', (data: RoundEndData) => {
       setRoundEndData(data);
-      setGameState(GameState.RoundEnd);
-      
-      // Stop audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
+      setGameState(GameStateValues.RoundEnd);
     });
 
     signalRService.on('GameOver', () => {
-      setGameState(GameState.GameOver);
-      
-      // Stop audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      setGameState(GameStateValues.GameOver);
     });
 
     signalRService.on('Error', (message: string) => {
@@ -108,7 +122,7 @@ export const GameRoomPage = () => {
       signalRService.off('GameOver');
       signalRService.off('Error');
     };
-  }, [navigate, setRoom]);
+  }, [navigate, roomCode, setRoom, setCurrentPlayer]);
 
   const handleStartGame = async () => {
     await signalRService.startGame();
@@ -138,7 +152,6 @@ export const GameRoomPage = () => {
 
   return (
     <div className="game-room-page">
-      <audio ref={audioRef} />
       
       <div className="room-header">
         <h1>Pokój: {roomCode}</h1>
@@ -153,36 +166,50 @@ export const GameRoomPage = () => {
         </div>
 
         <div className="main-area">
-          {gameState === GameState.Lobby && (
+          {gameState === GameStateValues.Lobby && (
             <div className="lobby">
-              <h2>Poczekalnia</h2>
-              
+              <h2>🎮 Poczekalnia</h2>
+
               {isHost && (
                 <>
-                  <PlaylistInput isLoading={isLoadingPlaylist} />
-                  
+                  <PlaylistInput
+                    isLoading={isLoadingPlaylist}
+                    musicSource={room.musicSource}
+                    error={playlistError}
+                  />
+
                   {room.playlist.length > 0 && (
                     <div className="playlist-info">
-                      <p>✓ Playlista załadowana: {room.playlist.length} utworów</p>
+                      <div className="playlist-info-icon">🎵</div>
+                      <p className="playlist-info-title">Playlista załadowana!</p>
+                      <p className="playlist-info-count">
+                        <strong>{room.playlist.length}</strong> utworów gotowych do gry
+                      </p>
                       <button onClick={handleStartGame} className="start-button">
-                        Rozpocznij grę
+                        ▶ Rozpocznij grę
                       </button>
                     </div>
                   )}
                 </>
               )}
-              
+
               {!isHost && room.playlist.length === 0 && (
-                <p>Oczekiwanie na gospodarza...</p>
+                <p className="waiting-text">⏳ Oczekiwanie na załadowanie playlisty przez gospodarza...</p>
               )}
-              
+
               {!isHost && room.playlist.length > 0 && (
-                <p>Oczekiwanie na rozpoczęcie gry...</p>
+                <div className="playlist-info">
+                  <div className="playlist-info-icon">🎵</div>
+                  <p className="playlist-info-title">Playlista załadowana!</p>
+                  <p className="playlist-info-count">
+                    <strong>{room.playlist.length}</strong> utworów · Oczekiwanie na start...
+                  </p>
+                </div>
               )}
             </div>
           )}
 
-          {(gameState === GameState.Playing || gameState === GameState.RoundEnd) && currentRound && (
+          {(gameState === GameStateValues.Playing || gameState === GameStateValues.RoundEnd) && currentRound && (
             <GamePlay
               round={currentRound}
               roundEndData={roundEndData}
@@ -193,7 +220,7 @@ export const GameRoomPage = () => {
             />
           )}
 
-          {gameState === GameState.GameOver && (
+          {gameState === GameStateValues.GameOver && (
             <Leaderboard players={room.players} onPlayAgain={() => navigate('/')} />
           )}
         </div>

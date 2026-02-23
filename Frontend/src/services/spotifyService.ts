@@ -1,7 +1,7 @@
 ﻿import axios from 'axios';
-import { Song } from '../types';
+import type { Song } from '../types';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = '/api';
 
 class SpotifyService {
   async getPlaylistTracks(playlistId: string): Promise<Song[]> {
@@ -9,7 +9,9 @@ class SpotifyService {
       const response = await axios.get(`${API_BASE_URL}/spotify/playlist/${playlistId}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching playlist:', error);
+      if (axios.isAxiosError(error) && error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
       throw error;
     }
   }

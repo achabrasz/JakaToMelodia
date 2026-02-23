@@ -21,6 +21,17 @@ public class SpotifyController : ControllerBase
         return Ok(new { url });
     }
 
+    [HttpGet("status")]
+    public IActionResult GetStatus([FromServices] IConfiguration config)
+    {
+        var redirectUri = config["Spotify:RedirectUri"];
+        return Ok(new
+        {
+            authenticated = _spotifyService.IsAuthenticated,
+            redirectUri  // shows what's configured so you can verify it matches the dashboard
+        });
+    }
+
     [HttpGet("callback")]
     public async Task<IActionResult> Callback([FromQuery] string code)
     {
@@ -28,7 +39,8 @@ public class SpotifyController : ControllerBase
         if (!success)
             return BadRequest("Failed to authenticate with Spotify");
 
-        return Redirect("/");
+        // Redirect back to the frontend — it will detect auth success via /api/spotify/status
+        return Redirect("http://localhost:5173/?spotify=authenticated");
     }
 
     [HttpGet("playlist/{playlistId}")]

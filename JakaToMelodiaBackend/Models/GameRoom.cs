@@ -12,6 +12,7 @@ public class GameRoom
     public DateTime? RoundStartTime { get; set; }
     public HashSet<string> PlayersWhoGuessed { get; set; } = new();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public MusicSource MusicSource { get; set; } = MusicSource.Spotify;
 }
 
 public enum GameState
@@ -21,3 +22,10 @@ public enum GameState
     RoundEnd,
     GameOver
 }
+
+public enum MusicSource
+{
+    Spotify = 0,
+    YouTube = 1
+}
+

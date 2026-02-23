@@ -1,6 +1,8 @@
 ﻿using JakaToMelodiaBackend.Models;
 using Microsoft.Extensions.Options;
 using SpotifyAPI.Web;
+using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace JakaToMelodiaBackend.Services;
 
@@ -9,90 +11,251 @@ public interface ISpotifyService
     Task<string> GetAuthorizationUrl();
     Task<bool> HandleCallback(string code);
     Task<List<Song>> GetPlaylistTracks(string playlistId);
+    bool IsAuthenticated { get; }
 }
 
 public class SpotifyService : ISpotifyService
 {
     private readonly SpotifySettings _settings;
-    private SpotifyClient? _spotifyClient;
+    private readonly ILogger<SpotifyService> _logger;
+    private readonly HttpClient _httpClient;
+    private string? _accessToken;
+    private string? _refreshToken;
+    private DateTime _tokenExpiry = DateTime.MinValue;
 
-    public SpotifyService(IOptions<SpotifySettings> settings)
+    public bool IsAuthenticated => _accessToken != null && DateTime.UtcNow < _tokenExpiry;
+
+    public SpotifyService(IOptions<SpotifySettings> settings, ILogger<SpotifyService> logger, IHttpClientFactory httpClientFactory)
     {
         _settings = settings.Value;
+        _logger = logger;
+        _httpClient = httpClientFactory.CreateClient("Spotify");
     }
 
-    public async Task<string> GetAuthorizationUrl()
+    public Task<string> GetAuthorizationUrl()
     {
-        var loginRequest = new LoginRequest(
-            new Uri(_settings.RedirectUri),
-            _settings.ClientId,
-            LoginRequest.ResponseType.Code
-        )
-        {
-            Scope = new[] { Scopes.PlaylistReadPrivate, Scopes.PlaylistReadCollaborative }
-        };
+        var scopes = "playlist-read-private playlist-read-collaborative user-library-read";
+        var redirectUri = Uri.EscapeDataString(_settings.RedirectUri);
+        var scopeEncoded = Uri.EscapeDataString(scopes);
 
-        return loginRequest.ToUri().ToString();
+        var url = $"https://accounts.spotify.com/authorize" +
+                  $"?response_type=code" +
+                  $"&client_id={_settings.ClientId}" +
+                  $"&scope={scopeEncoded}" +
+                  $"&redirect_uri={redirectUri}";
+
+        _logger.LogInformation("Spotify auth URL: {Url}", url);
+        _logger.LogInformation("Redirect URI used: {RedirectUri}", _settings.RedirectUri);
+
+        return Task.FromResult(url);
     }
 
     public async Task<bool> HandleCallback(string code)
     {
         try
         {
-            var response = await new OAuthClient().RequestToken(
-                new AuthorizationCodeTokenRequest(
-                    _settings.ClientId,
-                    _settings.ClientSecret,
-                    code,
-                    new Uri(_settings.RedirectUri)
-                )
-            );
+            _logger.LogInformation("Handling Spotify OAuth callback");
+            var credentials = Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes($"{_settings.ClientId}:{_settings.ClientSecret}"));
 
-            _spotifyClient = new SpotifyClient(response.AccessToken);
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            request.Content = new FormUrlEncodedContent(new[]
+            {
+                new KeyValuePair<string, string>("grant_type", "authorization_code"),
+                new KeyValuePair<string, string>("code", code),
+                new KeyValuePair<string, string>("redirect_uri", _settings.RedirectUri),
+            });
+
+            var response = await _httpClient.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Spotify OAuth callback failed: {Status} {Body}", response.StatusCode, body);
+                return false;
+            }
+
+            var json = JsonDocument.Parse(body);
+            _accessToken = json.RootElement.GetProperty("access_token").GetString()!;
+            _refreshToken = json.RootElement.TryGetProperty("refresh_token", out var rt) ? rt.GetString() : null;
+            var expiresIn = json.RootElement.GetProperty("expires_in").GetInt32();
+            _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
+
+            _logger.LogInformation("Spotify OAuth authenticated, token expires in {Seconds}s", expiresIn);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Error handling Spotify callback");
             return false;
         }
     }
 
-    public async Task<List<Song>> GetPlaylistTracks(string playlistId)
+    private async Task<string> GetValidTokenAsync()
     {
-        // Initialize client with client credentials if not already authenticated
-        if (_spotifyClient == null)
+        if (_accessToken != null && DateTime.UtcNow < _tokenExpiry)
+            return _accessToken;
+
+        if (_refreshToken != null)
         {
-            var config = SpotifyClientConfig.CreateDefault();
-            var request = new ClientCredentialsRequest(_settings.ClientId, _settings.ClientSecret);
-            var response = await new OAuthClient(config).RequestToken(request);
-            _spotifyClient = new SpotifyClient(config.WithToken(response.AccessToken));
+            _logger.LogInformation("Refreshing Spotify access token");
+            var credentials = Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes($"{_settings.ClientId}:{_settings.ClientSecret}"));
+
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            request.Content = new FormUrlEncodedContent(new[]
+            {
+                new KeyValuePair<string, string>("grant_type", "refresh_token"),
+                new KeyValuePair<string, string>("refresh_token", _refreshToken),
+            });
+
+            var response = await _httpClient.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = JsonDocument.Parse(body);
+                _accessToken = json.RootElement.GetProperty("access_token").GetString()!;
+                if (json.RootElement.TryGetProperty("refresh_token", out var newRt))
+                    _refreshToken = newRt.GetString();
+                var expiresIn = json.RootElement.GetProperty("expires_in").GetInt32();
+                _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
+                _logger.LogInformation("Spotify token refreshed");
+                return _accessToken;
+            }
+
+            _logger.LogWarning("Failed to refresh token: {Status} {Body}", response.StatusCode, body);
         }
 
+        throw new InvalidOperationException("Brak autoryzacji Spotify. Zaloguj się przez /api/spotify/auth");
+    }
+
+    public async Task<List<Song>> GetPlaylistTracks(string playlistId)
+    {
+        var token = await GetValidTokenAsync();
         var songs = new List<Song>();
 
         try
         {
-            var playlist = await _spotifyClient.Playlists.Get(playlistId);
-            
-            await foreach (var item in _spotifyClient.Paginate(playlist.Tracks!))
+            _logger.LogInformation("Fetching Spotify playlist {PlaylistId} via /playlists/[id]/items", playlistId);
+
+            var offset = 0;
+            const int limit = 50;
+
+            while (true)
             {
-                if (item.Track is FullTrack track)
+                // New endpoint: /playlists/{id}/items (replaces deprecated /playlists/{id}/tracks)
+                var url = $"https://api.spotify.com/v1/playlists/{playlistId}/items?limit={limit}&offset={offset}";
+                var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var resp = await _httpClient.SendAsync(req);
+                var body = await resp.Content.ReadAsStringAsync();
+
+                _logger.LogInformation("Spotify items response: status={Status}, offset={Offset}", resp.StatusCode, offset);
+
+                if (!resp.IsSuccessStatusCode)
                 {
-                    songs.Add(new Song
+                    _logger.LogError("Spotify API error: status={Status}, body={Body}", resp.StatusCode, body);
+                    if ((int)resp.StatusCode == 401)
                     {
-                        Id = track.Id,
-                        Title = track.Name,
-                        Artist = string.Join(", ", track.Artists.Select(a => a.Name).ToArray()),
-                        PreviewUrl = track.PreviewUrl ?? string.Empty,
-                        AlbumImageUrl = track.Album.Images.FirstOrDefault()?.Url ?? string.Empty,
-                        DurationMs = track.DurationMs
-                    });
+                        _accessToken = null;
+                        throw new InvalidOperationException("Token Spotify wygasł. Zaloguj się ponownie przez /api/spotify/auth");
+                    }
+                    if ((int)resp.StatusCode == 403)
+                        throw new InvalidOperationException("Brak dostępu do playlisty. Upewnij się że jest publiczna lub należy do Ciebie.");
+                    if ((int)resp.StatusCode == 404)
+                        throw new InvalidOperationException("Playlista nie została znaleziona.");
+                    throw new InvalidOperationException($"Błąd Spotify API: {resp.StatusCode} - {body}");
                 }
+
+                var page = JsonDocument.Parse(body).RootElement;
+
+                if (!page.TryGetProperty("items", out var items))
+                {
+                    _logger.LogWarning("No 'items' in Spotify response: {Body}", body[..Math.Min(500, body.Length)]);
+                    break;
+                }
+
+                foreach (var item in items.EnumerateArray())
+                {
+                    // New API uses "item" key (renamed from "track")
+                    JsonElement track;
+                    if (item.TryGetProperty("item", out track) && track.ValueKind != JsonValueKind.Null)
+                    {
+                        // new field name "item"
+                    }
+                    else if (item.TryGetProperty("track", out track) && track.ValueKind != JsonValueKind.Null)
+                    {
+                        // fallback for old field name
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    if (track.TryGetProperty("type", out var type) && type.GetString() != "track")
+                        continue; // skip episodes
+
+                    var id = track.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
+                    var title = track.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "";
+                    var previewUrl = track.TryGetProperty("preview_url", out var previewProp) && previewProp.ValueKind != JsonValueKind.Null
+                        ? previewProp.GetString() ?? ""
+                        : "";
+
+                    var artist = "";
+                    if (track.TryGetProperty("artists", out var artistsEl))
+                    {
+                        artist = string.Join(", ", artistsEl.EnumerateArray()
+                            .Select(a => a.TryGetProperty("name", out var n) ? n.GetString() ?? "" : ""));
+                    }
+
+                    var albumImage = "";
+                    if (track.TryGetProperty("album", out var album) && album.TryGetProperty("images", out var images))
+                    {
+                        var first = images.EnumerateArray().FirstOrDefault();
+                        if (first.ValueKind != JsonValueKind.Undefined)
+                            albumImage = first.TryGetProperty("url", out var imgUrl) ? imgUrl.GetString() ?? "" : "";
+                    }
+
+                    var durationMs = track.TryGetProperty("duration_ms", out var durProp) ? durProp.GetInt32() : 0;
+
+                    _logger.LogDebug("Track: {Title} by {Artist}, preview={HasPreview}",
+                        title, artist, string.IsNullOrEmpty(previewUrl) ? "NONE" : "YES");
+
+                    if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(title))
+                    {
+                        songs.Add(new Song
+                        {
+                            Id = id,
+                            Title = title,
+                            Artist = artist,
+                            PreviewUrl = previewUrl,
+                            AlbumImageUrl = albumImage,
+                            DurationMs = durationMs
+                        });
+                    }
+                }
+
+                if (!page.TryGetProperty("next", out var next) || next.ValueKind == JsonValueKind.Null)
+                    break;
+
+                offset += limit;
             }
+
+            _logger.LogInformation("Fetched {Total} tracks ({WithPreview} have preview URLs) from playlist {PlaylistId}",
+                songs.Count, songs.Count(s => !string.IsNullOrEmpty(s.PreviewUrl)), playlistId);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error fetching playlist: {ex.Message}");
+            _logger.LogError(ex, "Error fetching Spotify playlist {PlaylistId}", playlistId);
+            throw new InvalidOperationException($"Nie udało się pobrać playlisty: {ex.Message}");
         }
 
         return songs;

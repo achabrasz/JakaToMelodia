@@ -3,3 +3,7 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+
+#env
+JakaToMelodiaBackend/appsettings.Development.json
+JakaToMelodiaBackend/appsettings.json
