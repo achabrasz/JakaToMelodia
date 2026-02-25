@@ -2,6 +2,8 @@
 import type { Song, MusicSource } from '../types';
 import { MusicSourceValues } from '../types';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+
 class SignalRService {
   private connection: signalR.HubConnection | null = null;
   private roomCode: string = '';
@@ -13,7 +15,7 @@ class SignalRService {
     }
 
     this.connection = new signalR.HubConnectionBuilder()
-      .withUrl('/gameHub')
+      .withUrl(`${API_BASE_URL}/gameHub`)
       .withAutomaticReconnect()
       .build();
 

@@ -35,6 +35,7 @@ interface SpotifyEmbedController {
   pause: () => void;
   togglePlay: () => void;
   seek: (seconds: number) => void;
+  setVolume: (volume: number) => void;
   destroy: () => void;
   addListener: (event: string, callback: (data: any) => void) => void;
 }
@@ -51,6 +52,7 @@ export const GamePlay = ({
   const [guessStatus, setGuessStatus] = useState<GuessStatus>('idle');
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeLeft, setTimeLeft] = useState(20);
+  const [volume, setVolume] = useState(0.5);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerFiredRef = useRef(false);
   // Keep a ref to the latest onEndRound/isHost so the interval can call it without stale closures
@@ -66,70 +68,58 @@ export const GamePlay = ({
 
   const { id: trackId, previewUrl } = round.song;
 
-  // Initialize Spotify IFrame API
+  // Initialize Spotify IFrame API — runs once, creates the controller
   useEffect(() => {
     if (!trackId || previewUrl) return;
 
+    const initController = (IFrameAPI: SpotifyIframeApi) => {
+      (window as any).SpotifyIframeApi = IFrameAPI; // cache for re-mounts
+      if (!embedContainerRef.current || embedControllerRef.current) return;
+
+      IFrameAPI.createController(
+        embedContainerRef.current,
+        { uri: `spotify:track:${trackId}`, width: '300', height: '80' },
+        (EmbedController) => {
+          embedControllerRef.current = EmbedController;
+
+          EmbedController.addListener('playback_update', (e) => {
+            setIsPlaying(e?.data?.isPaused === false);
+          });
+
+          // Set initial volume (Spotify IFrame API uses 0–100)
+          EmbedController.setVolume(volume * 100);
+
+          console.log('🎮 Spotify Embed Controller Ready');
+          setTimeout(() => EmbedController.play(), 500);
+        }
+      );
+    };
+
     const scriptId = 'spotify-iframe-api';
     if (!document.getElementById(scriptId)) {
-        const script = document.createElement('script');
-        script.id = scriptId;
-        script.src = 'https://open.spotify.com/embed-podcast/iframe-api/v1';
-        script.async = true;
-        document.body.appendChild(script);
+      // Script not yet added — set callback then load script
+      window.onSpotifyIframeApiReady = initController;
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://open.spotify.com/embed-podcast/iframe-api/v1';
+      script.async = true;
+      document.body.appendChild(script);
+    } else if (!(window as any).SpotifyIframeApi) {
+      // Script added but API not ready yet — override callback
+      window.onSpotifyIframeApiReady = initController;
+    } else {
+      // API already ready — call directly
+      initController((window as any).SpotifyIframeApi);
     }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    window.onSpotifyIframeApiReady = (IFrameAPI: SpotifyIframeApi) => {
-        if (!embedContainerRef.current) return;
-        
-        const element = embedContainerRef.current;
-        const options = {
-            uri: `spotify:track:${trackId}`,
-            width: '100%',
-            height: '152',
-        };
-        
-        IFrameAPI.createController(element, options, (EmbedController) => {
-            embedControllerRef.current = EmbedController;
-            
-            EmbedController.addListener('playback_update', (e) => {
-                if (e.data && e.data.isPaused === false) {
-                     setIsPlaying(true);
-                } else {
-                     setIsPlaying(false);
-                }
-            });
-
-            // Attempt auto-play once controller is ready
-            console.log("🎮 Spotify Embed Controller Ready. Attempting Play...");
-            setTimeout(() => {
-                EmbedController.play();
-            }, 500); 
-        });
-    };
-    
-    // If API is already loaded but component re-mounted
-    // (This part is tricky because onSpotifyIframeApiReady might have fired already.
-    // Ideally we'd need a more robust loader, but let's stick to simple implementation first.)
-
-    return () => {
-        // Cleanup if needed
-    }
-  }, []); // Run once on mount to set up the global callback
-
-  // Effect to load new track when trackId changes
+  // Load new track into existing controller when round changes
   useEffect(() => {
-      if (!trackId || previewUrl) return;
+    if (!trackId || previewUrl || !embedControllerRef.current) return;
 
-      if (embedControllerRef.current) {
-          console.log(`🎵 Loading new track: ${trackId}`);
-          embedControllerRef.current.loadUri(`spotify:track:${trackId}`);
-          
-          // Try to auto-play after a short delay to allow loading
-          setTimeout(() => {
-              embedControllerRef.current?.play();
-          }, 800);
-      }
+    console.log(`🎵 Loading new track: ${trackId}`);
+    embedControllerRef.current.loadUri(`spotify:track:${trackId}`);
+    setTimeout(() => embedControllerRef.current?.play(), 800);
   }, [trackId, previewUrl]);
 
 
@@ -162,7 +152,7 @@ export const GamePlay = ({
         audioRef.current.pause();
         audioRef.current.src = previewUrl;
         audioRef.current.load();
-        audioRef.current.volume = 0.5;
+        audioRef.current.volume = volume;
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
             playPromise.then(() => {
@@ -239,6 +229,14 @@ export const GamePlay = ({
      }
   };
 
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    setVolume(v);
+    if (audioRef.current) audioRef.current.volume = v;
+    // Spotify IFrame API expects 0–100
+    embedControllerRef.current?.setVolume(v * 100);
+  };
+
   /** Render masked string: each letter→'*', space stays space */
   const renderMasked = (masked: string) =>
     masked.split('').map((ch, i) =>
@@ -308,6 +306,20 @@ export const GamePlay = ({
                 >
                   {isPlaying ? '⏸️ Zatrzymaj' : '▶️ Odtwórz Utwór'}
                 </button>
+                <div className="volume-control">
+                  <span className="volume-icon">🔈</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={volume}
+                    onChange={handleVolumeChange}
+                    className="volume-slider"
+                    aria-label="Głośność"
+                  />
+                  <span className="volume-icon">🔊</span>
+                </div>
               </div>
             </div>
           ) : trackId ? (
@@ -319,8 +331,22 @@ export const GamePlay = ({
                 >
                   {isPlaying ? '⏸️ Pauza' : '▶️ Odtwórz w Spotify'}
                 </button>
-                <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden', pointerEvents: 'none' }}>
-                  <div ref={embedContainerRef} />
+                <div className="volume-control" style={{ position: 'relative', width: 0, height: 0, overflow: 'hidden' }}>
+                  <span className="volume-icon">🔈</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={volume}
+                    onChange={handleVolumeChange}
+                    className="volume-slider"
+                    aria-label="Głośność"
+                  />
+                  <span className="volume-icon">🔊</span>
+                </div>
+                <div style={{ position: 'relative', width: 0, height: 0, overflow: 'hidden' }}>
+                  <div ref={embedContainerRef} style={{ position: 'absolute', width: '300px', height: '80px', opacity: 0, pointerEvents: 'none' }} />
                 </div>
               </div>
             </div>

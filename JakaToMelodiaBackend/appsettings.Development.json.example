@@ -6,6 +6,7 @@
     }
   },
   "AllowedHosts": "*",
+  "AllowedOrigins": "http://localhost:5173,http://127.0.0.1:5173",
   "Spotify": {
     "ClientId": "YOUR_SPOTIFY_CLIENT_ID",
     "ClientSecret": "YOUR_SPOTIFY_CLIENT_SECRET",
