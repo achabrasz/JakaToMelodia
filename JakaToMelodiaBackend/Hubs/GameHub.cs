@@ -165,7 +165,7 @@ public class GameHub : Hub
                 room.CurrentSong.DurationMs
             },
             maskedTitle = GetMaskedString(room.CurrentSong.Title),
-            maskedArtist = GetMaskedString(room.CurrentSong.Artist.Split(',').FirstOrDefault() ?? "Unknown"),
+            maskedArtist = GetMaskedString(room.CurrentSong.Artist),
             roundNumber = room.CurrentSongIndex + 1,
             totalRounds = room.Playlist.Count
         });
@@ -234,7 +234,7 @@ public class GameHub : Hub
         // Let's use simple logic here consistent with GameService logic.
         
         string title = System.Text.RegularExpressions.Regex.Replace(room.CurrentSong.Title, @"\s*[\(\[\{][^\)\]\}]*[\)\]\}]", "").Trim();
-        string artist = room.CurrentSong.Artist.Split(',').FirstOrDefault()?.Trim() ?? "Unknown";
+        string artist = room.CurrentSong.Artist;
 
         await Clients.Group(roomCode).SendAsync("RoundStarted", new
         {

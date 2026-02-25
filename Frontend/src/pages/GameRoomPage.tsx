@@ -176,6 +176,7 @@ export const GameRoomPage = () => {
                     isLoading={isLoadingPlaylist}
                     musicSource={room.musicSource}
                     error={playlistError}
+                    totalSongs={room.playlist.length}
                   />
 
                   {room.playlist.length > 0 && (

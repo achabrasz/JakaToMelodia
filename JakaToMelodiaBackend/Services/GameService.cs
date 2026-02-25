@@ -88,9 +88,10 @@ public class GameService : IGameService
         if (!_rooms.TryGetValue(roomCode, out var room))
             return false;
 
-        // Keep all songs — preview URLs may be empty (Spotify deprecated them);
-        // the frontend uses embedded Spotify player by track ID instead.
-        room.Playlist = songs.ToList();
+        // Accumulate songs — adding new ones to the pool, deduplicating by ID
+        var existingIds = room.Playlist.Select(s => s.Id).ToHashSet();
+        var newSongs = songs.Where(s => !existingIds.Contains(s.Id)).ToList();
+        room.Playlist.AddRange(newSongs);
         return true;
     }
 
@@ -240,8 +241,9 @@ public class GameService : IGameService
 
     private string StripBrackets(string input)
     {
-        // Remove anything in (), [], {} — e.g. "I Smoked Away My Brain (feat. X)" → "I Smoked Away My Brain"
+        // Remove parenthetical suffixes: (feat. X), [Radio Edit], {}, feat. X, ft. X, with X, vs X
         var result = System.Text.RegularExpressions.Regex.Replace(input, @"\s*[\(\[\{][^\)\]\}]*[\)\]\}]", "");
+        result = System.Text.RegularExpressions.Regex.Replace(result, @"\s+(feat\.?|ft\.?|with|vs\.?)\s+.*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         return result.Trim();
     }
 
@@ -252,6 +254,9 @@ public class GameService : IGameService
 
         var normalizedGuess = NormalizeString(guess);
         var normalizedTarget = NormalizeString(target);
+
+        if (normalizedGuess.Length == 0 || normalizedTarget.Length == 0)
+            return false;
 
         // Exact match
         if (normalizedGuess == normalizedTarget)
@@ -272,8 +277,36 @@ public class GameService : IGameService
     {
         if (string.IsNullOrWhiteSpace(input)) return "";
 
-        // Remove Polish and other diacritics by decomposing to base characters
-        var normalized = input.Normalize(System.Text.NormalizationForm.FormD);
+        var s = input.Trim().ToLowerInvariant();
+
+        // Special symbol replacements BEFORE diacritic stripping
+        s = s
+            .Replace("$", "s")
+            .Replace("€", "e")
+            .Replace("@", "a")
+            .Replace("0", "o")      // l33t: 0 -> o (optional, mild)
+            .Replace("3", "e")      // l33t: 3 -> e
+            .Replace("!", "i")      // ! -> i  (e.g. "!")
+            .Replace("&", "and")
+            .Replace("+", "and")
+            .Replace("#", "")
+            .Replace("*", "")
+            .Replace("'", "")
+            .Replace("\u2019", "") // right single quotation mark
+            .Replace("\u2018", "") // left single quotation mark
+            .Replace("\"", "")
+            .Replace("\u201C", "") // left double quotation mark
+            .Replace("\u201D", "") // right double quotation mark
+            .Replace("-", " ")
+            .Replace("_", " ")
+            .Replace(".", " ")
+            .Replace(",", " ")
+            .Replace("/", " ")
+            .Replace("\\", " ");
+
+        // Remove diacritics — but keep Polish letters intact by NOT stripping them,
+        // so "żółw" and "zolw" both normalize to "zolw"
+        var normalized = s.Normalize(System.Text.NormalizationForm.FormD);
         var sb = new System.Text.StringBuilder();
         foreach (var c in normalized)
         {
@@ -281,13 +314,11 @@ public class GameService : IGameService
                 != System.Globalization.UnicodeCategory.NonSpacingMark)
                 sb.Append(c);
         }
-        var withoutDiacritics = sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
+        s = sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
 
-        return withoutDiacritics.Trim().ToLowerInvariant()
-            .Replace("&", "and")
-            .Replace("'", "")
-            .Replace("\"", "")
-            .Replace("-", " ")
-            .Replace(".", "");
+        // Collapse multiple spaces
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ").Trim();
+
+        return s;
     }
 }

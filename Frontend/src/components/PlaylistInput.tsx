@@ -8,39 +8,37 @@ interface PlaylistInputProps {
   isLoading: boolean;
   musicSource: MusicSource;
   error?: string;
+  totalSongs?: number;
 }
 
-export const PlaylistInput = ({ isLoading, musicSource, error }: PlaylistInputProps) => {
+export const PlaylistInput = ({ isLoading, musicSource, error, totalSongs = 0 }: PlaylistInputProps) => {
   const [playlistUrl, setPlaylistUrl] = useState('');
+  const [loadedPlaylists, setLoadedPlaylists] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!playlistUrl.trim()) return;
 
-    await signalRService.setPlaylist(playlistUrl);
+    const url = playlistUrl.trim();
+    await signalRService.setPlaylist(url);
+    setLoadedPlaylists(prev => [...prev, url]);
     setPlaylistUrl('');
   };
 
-  const getPlaceholder = () => {
-    if (musicSource === MusicSourceValues.Spotify) {
-      return 'Wklej link do playlisty Spotify...';
-    }
-    return 'Wklej link do playlisty YouTube...';
-  };
+  const getPlaceholder = () =>
+    musicSource === MusicSourceValues.Spotify
+      ? 'Wklej link do playlisty Spotify...'
+      : 'Wklej link do playlisty YouTube...';
 
-  const getTitle = () => {
-    if (musicSource === MusicSourceValues.Spotify) {
-      return 'Dodaj playlistę Spotify';
-    }
-    return 'Dodaj playlistę YouTube';
-  };
+  const getTitle = () =>
+    musicSource === MusicSourceValues.Spotify
+      ? 'Dodaj playlisty Spotify'
+      : 'Dodaj playlisty YouTube';
 
-  const getHint = () => {
-    if (musicSource === MusicSourceValues.Spotify) {
-      return 'Skopiuj link do playlisty Spotify (np. https://open.spotify.com/playlist/...)';
-    }
-    return 'Skopiuj link do playlisty YouTube (np. https://www.youtube.com/playlist?list=...)';
-  };
+  const getHint = () =>
+    musicSource === MusicSourceValues.Spotify
+      ? 'Możesz dodać wiele playlist — ich piosenki zostaną połączone'
+      : 'Możesz dodać wiele playlist — ich piosenki zostaną połączone';
 
   return (
     <div className="playlist-input">
@@ -59,10 +57,27 @@ export const PlaylistInput = ({ isLoading, musicSource, error }: PlaylistInputPr
           disabled={isLoading || !playlistUrl.trim()}
           className="load-playlist-button"
         >
-          {isLoading ? 'Ładowanie...' : 'Załaduj playlistę'}
+          {isLoading ? 'Ładowanie...' : 'Dodaj playlistę'}
         </button>
       </form>
+
       {error && <p className="playlist-error">⚠️ {error}</p>}
+
+      {loadedPlaylists.length > 0 && (
+        <div className="loaded-playlists">
+          <p className="loaded-playlists-header">
+            ✅ Załadowane playlisty ({loadedPlaylists.length}) — łącznie <strong>{totalSongs}</strong> utworów:
+          </p>
+          <ul className="loaded-playlists-list">
+            {loadedPlaylists.map((url, i) => (
+              <li key={i} className="loaded-playlist-item" title={url}>
+                🎵 {url.length > 50 ? url.slice(0, 50) + '…' : url}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <p className="hint">{getHint()}</p>
     </div>
   );

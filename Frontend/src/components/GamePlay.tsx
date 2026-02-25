@@ -87,7 +87,7 @@ export const GamePlay = ({
           });
 
           // Set initial volume (Spotify IFrame API uses 0–100)
-          EmbedController.setVolume(volume * 100);
+          //EmbedController.setVolume(volume * 100);
 
           console.log('🎮 Spotify Embed Controller Ready');
           setTimeout(() => EmbedController.play(), 500);

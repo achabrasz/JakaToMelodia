@@ -80,3 +80,33 @@
   font-weight: 500;
 }
 
+.loaded-playlists {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 8px;
+}
+
+.loaded-playlists-header {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.loaded-playlists-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+}
+
+.loaded-playlist-item {
+  font-size: 0.82rem;
+  color: #388e3c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  list-style: none;
+  padding: 2px 0;
+}
