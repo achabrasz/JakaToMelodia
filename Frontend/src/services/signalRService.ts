@@ -28,9 +28,9 @@ class SignalRService {
     }
   }
 
-  async createRoom(playerName: string, musicSource: MusicSource = MusicSourceValues.Spotify): Promise<string> {
+  async createRoom(playerName: string, musicSource: MusicSource = MusicSourceValues.Spotify, maxRounds: number = 0): Promise<string> {
     if (!this.connection) throw new Error('Not connected');
-    this.roomCode = await this.connection.invoke('CreateRoom', playerName, musicSource);
+    this.roomCode = await this.connection.invoke('CreateRoom', playerName, musicSource, maxRounds);
     return this.roomCode;
   }
 

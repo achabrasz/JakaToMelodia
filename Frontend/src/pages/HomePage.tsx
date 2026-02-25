@@ -14,6 +14,7 @@ export const HomePage = () => {
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState('');
   const [selectedMusicSource, setSelectedMusicSource] = useState<MusicSource>(MusicSourceValues.Spotify);
+  const [maxRounds, setMaxRounds] = useState<number>(10);
   const [spotifyAuthed, setSpotifyAuthed] = useState<boolean | null>(null);
   const [spotifyRedirectUri, setSpotifyRedirectUri] = useState<string>('');
 
@@ -59,7 +60,7 @@ export const HomePage = () => {
 
     try {
       await signalRService.connect();
-      const code = await signalRService.createRoom(playerName, selectedMusicSource);
+      const code = await signalRService.createRoom(playerName, selectedMusicSource, maxRounds);
       
       setCurrentPlayer({
         id: generateId(),
@@ -150,6 +151,36 @@ export const HomePage = () => {
             onChange={(e) => setPlayerName(e.target.value)}
             className="input"
           />
+        </div>
+
+        <div className="max-rounds-section">
+          <label className="max-rounds-label" htmlFor="maxRounds">
+            Liczba rund:
+          </label>
+          <div className="max-rounds-controls">
+            <button
+              className="rounds-btn"
+              onClick={() => setMaxRounds(r => Math.max(1, r - 1))}
+              type="button"
+            >−</button>
+            <input
+              id="maxRounds"
+              type="number"
+              min={1}
+              max={50}
+              value={maxRounds}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 1 && v <= 50) setMaxRounds(v);
+              }}
+              className="rounds-input"
+            />
+            <button
+              className="rounds-btn"
+              onClick={() => setMaxRounds(r => Math.min(50, r + 1))}
+              type="button"
+            >+</button>
+          </div>
         </div>
         {error && <div className="error">{error}</div>}
 

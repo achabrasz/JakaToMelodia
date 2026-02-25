@@ -17,7 +17,7 @@ export interface Song {
 
 export type MusicSource = 0 | 1;
 export type GameState = 0 | 1 | 2 | 3;
-export type GuessType = 0 | 1 | 2;
+export type GuessType = 0 | 1 | 2 | 3;
 
 export interface GameRoom {
   roomId: string;
@@ -30,6 +30,7 @@ export interface GameRoom {
   roundStartTime: string | null;
   playersWhoGuessed: string[];
   musicSource: MusicSource;
+  maxRounds: number;
 }
 
 export interface GuessResult {
@@ -46,6 +47,8 @@ export interface RoundData {
     albumImageUrl: string;
     durationMs: number;
   };
+  maskedTitle: string;
+  maskedArtist: string;
   roundNumber: number;
   totalRounds: number;
 }
@@ -73,5 +76,5 @@ export const GuessTypeValues = {
   None: 0 as GuessType,
   Title: 1 as GuessType,
   Artist: 2 as GuessType,
+  Both: 3 as GuessType,
 } as const;
-

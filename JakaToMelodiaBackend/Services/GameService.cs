@@ -4,7 +4,7 @@ namespace JakaToMelodiaBackend.Services;
 
 public interface IGameService
 {
-    GameRoom CreateRoom(MusicSource musicSource = MusicSource.Spotify);
+    GameRoom CreateRoom(MusicSource musicSource = MusicSource.Spotify, int maxRounds = 0);
     GameRoom? GetRoom(string roomCode);
     bool JoinRoom(string roomCode, Player player);
     bool LeaveRoom(string roomCode, string playerId);
@@ -23,12 +23,13 @@ public class GameService : IGameService
     private const int TitlePoints = 100;
     private const int ArtistPoints = 50;
 
-    public GameRoom CreateRoom(MusicSource musicSource = MusicSource.Spotify)
+    public GameRoom CreateRoom(MusicSource musicSource = MusicSource.Spotify, int maxRounds = 0)
     {
         var room = new GameRoom
         {
             RoomCode = GenerateRoomCode(),
-            MusicSource = musicSource
+            MusicSource = musicSource,
+            MaxRounds = maxRounds > 0 ? maxRounds : 0
         };
         _rooms[room.RoomCode] = room;
         return room;
@@ -107,6 +108,10 @@ public class GameService : IGameService
         // Shuffle playlist
         room.Playlist = room.Playlist.OrderBy(_ => _random.Next()).ToList();
         
+        // Cap to MaxRounds if set
+        if (room.MaxRounds > 0 && room.Playlist.Count > room.MaxRounds)
+            room.Playlist = room.Playlist.Take(room.MaxRounds).ToList();
+        
         return StartNextRound(roomCode);
     }
 
@@ -123,7 +128,7 @@ public class GameService : IGameService
 
         room.CurrentSong = room.Playlist[room.CurrentSongIndex];
         room.RoundStartTime = DateTime.UtcNow;
-        room.PlayersWhoGuessed.Clear();
+        room.PlayersRoundState.Clear();
         room.State = GameState.Playing;
         
         return true;
@@ -138,36 +143,63 @@ public class GameService : IGameService
         if (player == null || room.CurrentSong == null)
             return new GuessResult { IsCorrect = false };
 
-        // Check if player already guessed this round
-        if (room.PlayersWhoGuessed.Contains(playerId))
+        if (player == null || room.CurrentSong == null)
             return new GuessResult { IsCorrect = false };
 
-        room.PlayersWhoGuessed.Add(playerId);
+        if (!room.PlayersRoundState.ContainsKey(playerId))
+        {
+            room.PlayersRoundState[playerId] = new PlayerRoundState();
+        }
+        var roundState = room.PlayersRoundState[playerId];
+
+        // If player already guessed both, ignore further guesses
+        if (roundState.GuessedArtist && roundState.GuessedTitle)
+            return new GuessResult { IsCorrect = false };
 
         var result = new GuessResult
         {
             PlayerName = player.Name
         };
 
-        // Check title match (strip brackets first)
-        var cleanTitle = StripBrackets(room.CurrentSong.Title);
-        if (IsMatch(guess, cleanTitle) || IsMatch(guess, room.CurrentSong.Title))
+        bool pointAwarded = false;
+
+        // Check Artist (if not yet guessed)
+        // Use first artist only for simplicity as requested, but also support "Artist1, Artist2" matches
+        if (!roundState.GuessedArtist)
         {
-            result.IsCorrect = true;
-            result.Type = GuessType.Title;
-            result.PointsAwarded = TitlePoints;
-            player.Score += TitlePoints;
+            var artists = room.CurrentSong.Artist.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(a => a.Trim())
+                .ToList();
+            
+            // Check against any individual artist or the full string
+            if (artists.Any(a => IsMatch(guess, a)) || IsMatch(guess, room.CurrentSong.Artist))
+            {
+                result.IsCorrect = true;
+                result.Type = GuessType.Artist;
+                result.PointsAwarded += ArtistPoints;
+                player.Score += ArtistPoints;
+                roundState.GuessedArtist = true;
+                pointAwarded = true;
+            }
         }
-        // Check artist match — any single artist from the comma-separated list is enough
-        else if (room.CurrentSong.Artist.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                     .Any(a => IsMatch(guess, a.Trim())))
+
+        // Check Title (if not yet guessed)
+        if (!roundState.GuessedTitle)
         {
-            result.IsCorrect = true;
-            result.Type = GuessType.Artist;
-            result.PointsAwarded = ArtistPoints;
-            player.Score += ArtistPoints;
+            var cleanTitle = StripBrackets(room.CurrentSong.Title);
+            if (IsMatch(guess, cleanTitle) || IsMatch(guess, room.CurrentSong.Title))
+            {
+                result.IsCorrect = true;
+                // If they actally guessed both in one go (rare but possible if logic allowed), or just title now
+                result.Type = pointAwarded ? GuessType.Both : GuessType.Title; 
+                result.PointsAwarded += TitlePoints; // Add to existing if any
+                player.Score += TitlePoints;
+                roundState.GuessedTitle = true;
+                pointAwarded = true;
+            }
         }
-        else
+
+        if (!pointAwarded)
         {
             result.IsCorrect = false;
             result.Type = GuessType.None;

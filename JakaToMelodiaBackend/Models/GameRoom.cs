@@ -10,9 +10,10 @@ public class GameRoom
     public Song? CurrentSong { get; set; }
     public int CurrentSongIndex { get; set; } = 0;
     public DateTime? RoundStartTime { get; set; }
-    public HashSet<string> PlayersWhoGuessed { get; set; } = new();
+    public Dictionary<string, PlayerRoundState> PlayersRoundState { get; set; } = new();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public MusicSource MusicSource { get; set; } = MusicSource.Spotify;
+    public int MaxRounds { get; set; } = 0; // 0 = use full playlist
 }
 
 public enum GameState
@@ -29,3 +30,8 @@ public enum MusicSource
     YouTube = 1
 }
 
+public class PlayerRoundState
+{
+    public bool GuessedArtist { get; set; }
+    public bool GuessedTitle { get; set; }
+}

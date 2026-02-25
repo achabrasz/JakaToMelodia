@@ -1,4 +1,4 @@
-﻿﻿.home-page {
+﻿.home-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -203,3 +203,66 @@
   box-shadow: 0 8px 20px rgba(29, 185, 84, 0.4);
 }
 
+/* ── Max rounds selector ── */
+.max-rounds-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.max-rounds-label {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.max-rounds-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rounds-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #667eea;
+  background: white;
+  color: #667eea;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.rounds-btn:hover {
+  background: #667eea;
+  color: white;
+}
+
+.rounds-input {
+  width: 52px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 4px 6px;
+  color: #333;
+  -moz-appearance: textfield;
+}
+
+.rounds-input::-webkit-inner-spin-button,
+.rounds-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

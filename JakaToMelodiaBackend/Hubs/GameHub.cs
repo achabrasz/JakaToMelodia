@@ -15,12 +15,12 @@ public class GameHub : Hub
         _logger = logger;
     }
 
-    public async Task<string> CreateRoom(string playerName, MusicSource musicSource = MusicSource.Spotify)
+    public async Task<string> CreateRoom(string playerName, MusicSource musicSource = MusicSource.Spotify, int maxRounds = 0)
     {
-        _logger.LogInformation("CreateRoom: player={PlayerName}, source={MusicSource}, connectionId={ConnectionId}",
-            playerName, musicSource, Context.ConnectionId);
+        _logger.LogInformation("CreateRoom: player={PlayerName}, source={MusicSource}, maxRounds={MaxRounds}, connectionId={ConnectionId}",
+            playerName, musicSource, maxRounds, Context.ConnectionId);
 
-        var room = _gameService.CreateRoom(musicSource);
+        var room = _gameService.CreateRoom(musicSource, maxRounds);
         var player = new Player
         {
             Name = playerName,
@@ -164,6 +164,8 @@ public class GameHub : Hub
                 room.CurrentSong.AlbumImageUrl,
                 room.CurrentSong.DurationMs
             },
+            maskedTitle = GetMaskedString(room.CurrentSong.Title),
+            maskedArtist = GetMaskedString(room.CurrentSong.Artist.Split(',').FirstOrDefault() ?? "Unknown"),
             roundNumber = room.CurrentSongIndex + 1,
             totalRounds = room.Playlist.Count
         });
@@ -225,6 +227,15 @@ public class GameHub : Hub
 
         if (room.CurrentSong == null) return;
 
+        // Masking logic: strip brackets for title, take first artist for artist
+        // We need to use GameService helpers here but they are private.
+        // For now, duplicate simple logic or expose helper.
+        // Simulating StripBrackets simply by regex if needed, or just sending raw masked.
+        // Let's use simple logic here consistent with GameService logic.
+        
+        string title = System.Text.RegularExpressions.Regex.Replace(room.CurrentSong.Title, @"\s*[\(\[\{][^\)\]\}]*[\)\]\}]", "").Trim();
+        string artist = room.CurrentSong.Artist.Split(',').FirstOrDefault()?.Trim() ?? "Unknown";
+
         await Clients.Group(roomCode).SendAsync("RoundStarted", new
         {
             song = new
@@ -234,6 +245,8 @@ public class GameHub : Hub
                 room.CurrentSong.AlbumImageUrl,
                 room.CurrentSong.DurationMs
             },
+            maskedTitle = GetMaskedString(title),
+            maskedArtist = GetMaskedString(artist),
             roundNumber = room.CurrentSongIndex + 1,
             totalRounds = room.Playlist.Count
         });
@@ -277,5 +290,11 @@ public class GameHub : Hub
         }
 
         return string.Empty;
+    }
+
+    private string GetMaskedString(string input)
+    {
+        // Replace letters/numbers with asterisks, keep spaces/punctuation
+        return new string(input.Select(c => char.IsLetterOrDigit(c) ? '*' : c).ToArray());
     }
 }

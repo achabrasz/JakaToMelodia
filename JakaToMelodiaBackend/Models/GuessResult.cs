@@ -12,5 +12,6 @@ public enum GuessType
 {
     None,
     Title,      // Full points
-    Artist      // Half points
+    Artist,      // Half points
+    Both
 }
