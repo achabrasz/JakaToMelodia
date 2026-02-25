@@ -159,6 +159,9 @@ export const GamePlay = ({
     
     // Try to autoplay if previewUrl is available
     if (previewUrl && audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = previewUrl;
+        audioRef.current.load();
         audioRef.current.volume = 0.5;
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
@@ -248,158 +251,145 @@ export const GamePlay = ({
 
 
 
-  if (roundEndData) {
-    return (
-      <div className="round-end">
-        <h2>Koniec rundy!</h2>
-        <div className="song-reveal">
-          {roundEndData.albumImageUrl && (
-            <img src={roundEndData.albumImageUrl} alt="Album cover" className="album-cover" />
-          )}
-          <h3>{roundEndData.title}</h3>
-          <p className="artist">{roundEndData.artist}</p>
-        </div>
-        
-        {isHost && (
-          <button onClick={onNextRound} className="next-round-button">
-            Następna runda
-          </button>
-        )}
-        {!isHost && <p>Oczekiwanie na gospodarza...</p>}
-      </div>
-    );
-  }
-
   return (
     <div className="game-play">
-      <div className="round-info">
-        <h2>Runda {round.roundNumber} / {round.totalRounds}</h2>
-        <div className={`round-timer ${timeLeft <= 5 ? 'timer-danger' : timeLeft <= 10 ? 'timer-warning' : ''}`}>
-          <svg className="timer-ring" viewBox="0 0 44 44">
-            <circle cx="22" cy="22" r="18" className="timer-ring-bg" />
-            <circle
-              cx="22" cy="22" r="18"
-              className="timer-ring-fill"
-              strokeDasharray={`${(timeLeft / 20) * 113.1} 113.1`}
-            />
-          </svg>
-          <span className="timer-text">{timeLeft}</span>
+      {/* ── Round-end overlay — shown on top, player stays mounted below ── */}
+      {roundEndData && (
+        <div className="round-end">
+          <h2>Koniec rundy!</h2>
+          <div className="song-reveal">
+            {roundEndData.albumImageUrl && (
+              <img src={roundEndData.albumImageUrl} alt="Album cover" className="album-cover" />
+            )}
+            <h3>{roundEndData.title}</h3>
+            <p className="artist">{roundEndData.artist}</p>
+          </div>
+          {isHost && (
+            <button onClick={onNextRound} className="next-round-button">
+              Następna runda
+            </button>
+          )}
+          {!isHost && <p>Oczekiwanie na gospodarza...</p>}
         </div>
-      </div>
+      )}
 
-      <div className="song-player">
-        {previewUrl ? (
+      {/* ── Game UI — always mounted so refs (audioRef, embedContainerRef) stay valid ── */}
+      <div style={{ display: roundEndData ? 'none' : 'block' }}>
+        <div className="round-info">
+          <h2>Runda {round.roundNumber} / {round.totalRounds}</h2>
+          <div className={`round-timer ${timeLeft <= 5 ? 'timer-danger' : timeLeft <= 10 ? 'timer-warning' : ''}`}>
+            <svg className="timer-ring" viewBox="0 0 44 44">
+              <circle cx="22" cy="22" r="18" className="timer-ring-bg" />
+              <circle
+                cx="22" cy="22" r="18"
+                className="timer-ring-fill"
+                strokeDasharray={`${(timeLeft / 20) * 113.1} 113.1`}
+              />
+            </svg>
+            <span className="timer-text">{timeLeft}</span>
+          </div>
+        </div>
+
+        <div className="song-player">
+          {previewUrl ? (
             <div className="custom-player">
               <div className="audio-player-container">
-                  <audio
-                    ref={audioRef}
-                    src={previewUrl}
-                    onEnded={() => setIsPlaying(false)}
-                    preload="auto"
-                  >
-                    <track kind="captions" />
-                  </audio>
-                  
-                  <button 
-                    className={`giant-play-button ${isPlaying ? 'playing' : ''}`}
-                    onClick={handleManualPlay}
-                  >
-                    {isPlaying ? '⏸️ Zatrzymaj' : '▶️ Odtwórz Utwór'}
-                  </button>
+                <audio
+                  ref={audioRef}
+                  src={previewUrl}
+                  onEnded={() => setIsPlaying(false)}
+                  preload="auto"
+                >
+                  <track kind="captions" />
+                </audio>
+                <button
+                  className={`giant-play-button ${isPlaying ? 'playing' : ''}`}
+                  onClick={handleManualPlay}
+                >
+                  {isPlaying ? '⏸️ Zatrzymaj' : '▶️ Odtwórz Utwór'}
+                </button>
               </div>
             </div>
-        ) : trackId ? (
+          ) : trackId ? (
             <div className="custom-player">
-               {/* Spotify Embed IFrame API Container */}
-                <div className="spotify-player-container">
-                  
-                  <button 
-                    className={`giant-play-button ${isPlaying ? 'playing' : ''}`}
-                    onClick={handleManualPlay}
-                  >
-                     {isPlaying ? '⏸️ Pauza' : '▶️ Odtwórz w Spotify'}
-                  </button>
-
-                  <div ref={embedContainerRef} style={{ marginTop: '20px', width: '100%' }} />
-                  
-                  <div className="player-info-text" style={{ marginTop: '10px', fontSize: '0.8em', opacity: 0.7 }}>
-                    Jeśli autoodtwarzanie nie działa, użyj przycisku powyżej.
-                  </div>
+              <div className="spotify-player-container">
+                <button
+                  className={`giant-play-button ${isPlaying ? 'playing' : ''}`}
+                  onClick={handleManualPlay}
+                >
+                  {isPlaying ? '⏸️ Pauza' : '▶️ Odtwórz w Spotify'}
+                </button>
+                <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden', pointerEvents: 'none' }}>
+                  <div ref={embedContainerRef} />
                 </div>
+              </div>
             </div>
-        ) : (
-          <div className="now-playing">🎵 Odtwarzanie...</div>
+          ) : (
+            <div className="now-playing">🎵 Odtwarzanie...</div>
+          )}
+        </div>
+
+        <div className="song-hints">
+          <div className="hint-row">
+            <span className="hint-label">Tytuł:</span>
+            <span className="hint-mask">
+              {guessStatus === 'guessedTitle' || guessStatus === 'guessedBoth'
+                ? <span className="hint-revealed">✓ Odgadnięty!</span>
+                : renderMasked(round.maskedTitle)}
+            </span>
+          </div>
+          <div className="hint-row">
+            <span className="hint-label">Wykonawca:</span>
+            <span className="hint-mask">
+              {guessStatus === 'guessedArtist' || guessStatus === 'guessedBoth'
+                ? <span className="hint-revealed">✓ Odgadnięty!</span>
+                : renderMasked(round.maskedArtist)}
+            </span>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmitGuess} className="guess-form">
+          <input
+            type="text"
+            placeholder="Wpisz tytuł lub wykonawcę..."
+            value={guess}
+            onChange={(e) => setGuess(e.target.value)}
+            disabled={guessStatus === 'guessedBoth'}
+            className="guess-input"
+            autoFocus
+          />
+          <button
+            type="submit"
+            disabled={!guess.trim() || guessStatus === 'guessedBoth'}
+            className="submit-guess-button"
+          >
+            {guessStatus === 'guessedBoth' ? '✓ Odgadnięto' : 'Zgadnij'}
+          </button>
+        </form>
+
+        {guessStatus === 'guessedBoth' && (
+          <div className="guess-status">Odgadłeś tytuł i wykonawcę! Czekaj na koniec rundy...</div>
         )}
-      </div>
+        {guessStatus === 'guessedTitle' && (
+          <div className="guess-status">✓ Tytuł odgadnięty! Zgadnij teraz wykonawcę...</div>
+        )}
+        {guessStatus === 'guessedArtist' && (
+          <div className="guess-status">✓ Wykonawca odgadnięty! Zgadnij teraz tytuł...</div>
+        )}
+        {guessStatus === 'incorrect' && (
+          <div className="guess-status incorrect">✗ Niepoprawna odpowiedź. Spróbuj ponownie!</div>
+        )}
 
-      <div className="song-hints">
-        <div className="hint-row">
-          <span className="hint-label">Tytuł:</span>
-          <span className="hint-mask">
-            {guessStatus === 'guessedTitle' || guessStatus === 'guessedBoth'
-              ? <span className="hint-revealed">✓ Odgadnięty!</span>
-              : renderMasked(round.maskedTitle)}
-          </span>
-        </div>
-        <div className="hint-row">
-          <span className="hint-label">Wykonawca:</span>
-          <span className="hint-mask">
-            {guessStatus === 'guessedArtist' || guessStatus === 'guessedBoth'
-              ? <span className="hint-revealed">✓ Odgadnięty!</span>
-              : renderMasked(round.maskedArtist)}
-          </span>
-        </div>
-      </div>
+        {isHost && (
+          <button onClick={onEndRound} className="end-round-button">
+            Zakończ rundę
+          </button>
+        )}
 
-      <form onSubmit={handleSubmitGuess} className="guess-form">
-        <input
-          type="text"
-          placeholder="Wpisz tytuł lub wykonawcę..."
-          value={guess}
-          onChange={(e) => setGuess(e.target.value)}
-          disabled={guessStatus === 'guessedBoth'}
-          className="guess-input"
-          autoFocus
-        />
-        <button
-          type="submit"
-          disabled={!guess.trim() || guessStatus === 'guessedBoth'}
-          className="submit-guess-button"
-        >
-          {guessStatus === 'guessedBoth' ? '✓ Odgadnięto' : 'Zgadnij'}
-        </button>
-      </form>
-
-      {guessStatus === 'guessedBoth' && (
-        <div className="guess-status">
-          Odgadłeś tytuł i wykonawcę! Czekaj na koniec rundy...
+        <div className="scoring-info">
+          <p><strong>Punktacja:</strong></p>
+          <p>✓ Tytuł utworu: 100 pkt &nbsp;|&nbsp; ✓ Wykonawca: 50 pkt</p>
         </div>
-      )}
-      {guessStatus === 'guessedTitle' && (
-        <div className="guess-status">
-          ✓ Tytuł odgadnięty! Zgadnij teraz wykonawcę...
-        </div>
-      )}
-      {guessStatus === 'guessedArtist' && (
-        <div className="guess-status">
-          ✓ Wykonawca odgadnięty! Zgadnij teraz tytuł...
-        </div>
-      )}
-      {guessStatus === 'incorrect' && (
-        <div className="guess-status incorrect">
-          ✗ Niepoprawna odpowiedź. Spróbuj ponownie!
-        </div>
-      )}
-
-      {isHost && (
-        <button onClick={onEndRound} className="end-round-button">
-          Zakończ rundę
-        </button>
-      )}
-
-      <div className="scoring-info">
-        <p><strong>Punktacja:</strong></p>
-        <p>✓ Tytuł utworu: 100 pkt &nbsp;|&nbsp; ✓ Wykonawca: 50 pkt</p>
       </div>
     </div>
   );
