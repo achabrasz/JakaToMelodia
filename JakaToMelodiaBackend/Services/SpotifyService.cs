@@ -1,6 +1,5 @@
 ﻿using JakaToMelodiaBackend.Models;
 using Microsoft.Extensions.Options;
-using SpotifyAPI.Web;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
@@ -19,9 +18,14 @@ public class SpotifyService : ISpotifyService
     private readonly SpotifySettings _settings;
     private readonly ILogger<SpotifyService> _logger;
     private readonly HttpClient _httpClient;
+
+    // User OAuth token (Authorization Code flow) — kept for IsAuthenticated status
     private string? _accessToken;
-    private string? _refreshToken;
     private DateTime _tokenExpiry = DateTime.MinValue;
+
+    // App-level token (Client Credentials flow) — works for all public playlists
+    private string? _ccToken;
+    private DateTime _ccTokenExpiry = DateTime.MinValue;
 
     public bool IsAuthenticated => _accessToken != null && DateTime.UtcNow < _tokenExpiry;
 
@@ -78,7 +82,6 @@ public class SpotifyService : ISpotifyService
 
             var json = JsonDocument.Parse(body);
             _accessToken = json.RootElement.GetProperty("access_token").GetString()!;
-            _refreshToken = json.RootElement.TryGetProperty("refresh_token", out var rt) ? rt.GetString() : null;
             var expiresIn = json.RootElement.GetProperty("expires_in").GetInt32();
             _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
 
@@ -92,49 +95,41 @@ public class SpotifyService : ISpotifyService
         }
     }
 
-    private async Task<string> GetValidTokenAsync()
+    private async Task<string> GetClientCredentialsTokenAsync()
     {
-        if (_accessToken != null && DateTime.UtcNow < _tokenExpiry)
-            return _accessToken;
+        if (_ccToken != null && DateTime.UtcNow < _ccTokenExpiry)
+            return _ccToken;
 
-        if (_refreshToken != null)
+        _logger.LogInformation("Fetching Spotify Client Credentials token");
+        var credentials = Convert.ToBase64String(
+            System.Text.Encoding.UTF8.GetBytes($"{_settings.ClientId}:{_settings.ClientSecret}"));
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+        request.Content = new FormUrlEncodedContent(new[]
         {
-            _logger.LogInformation("Refreshing Spotify access token");
-            var credentials = Convert.ToBase64String(
-                System.Text.Encoding.UTF8.GetBytes($"{_settings.ClientId}:{_settings.ClientSecret}"));
+            new KeyValuePair<string, string>("grant_type", "client_credentials"),
+        });
 
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://accounts.spotify.com/api/token");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-            request.Content = new FormUrlEncodedContent(new[]
-            {
-                new KeyValuePair<string, string>("grant_type", "refresh_token"),
-                new KeyValuePair<string, string>("refresh_token", _refreshToken),
-            });
+        var response = await _httpClient.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
 
-            var response = await _httpClient.SendAsync(request);
-            var body = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Nie udało się uzyskać tokenu Spotify: {response.StatusCode} - {body}");
 
-            if (response.IsSuccessStatusCode)
-            {
-                var json = JsonDocument.Parse(body);
-                _accessToken = json.RootElement.GetProperty("access_token").GetString()!;
-                if (json.RootElement.TryGetProperty("refresh_token", out var newRt))
-                    _refreshToken = newRt.GetString();
-                var expiresIn = json.RootElement.GetProperty("expires_in").GetInt32();
-                _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
-                _logger.LogInformation("Spotify token refreshed");
-                return _accessToken;
-            }
+        var json = JsonDocument.Parse(body);
+        _ccToken = json.RootElement.GetProperty("access_token").GetString()!;
+        var expiresIn = json.RootElement.GetProperty("expires_in").GetInt32();
+        _ccTokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
 
-            _logger.LogWarning("Failed to refresh token: {Status} {Body}", response.StatusCode, body);
-        }
-
-        throw new InvalidOperationException("Brak autoryzacji Spotify. Zaloguj się przez /api/spotify/auth");
+        _logger.LogInformation("Spotify Client Credentials token acquired, expires in {Seconds}s", expiresIn);
+        return _ccToken;
     }
 
     public async Task<List<Song>> GetPlaylistTracks(string playlistId)
     {
-        var token = await GetValidTokenAsync();
+        // Use Client Credentials token — works for ALL public playlists without user login
+        var token = await GetClientCredentialsTokenAsync();
         var songs = new List<Song>();
 
         try
