@@ -56,5 +56,9 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<GameHub>("/gameHub");
 
+// Pre-authenticate Spotify on startup using stored refresh token
+var spotifyService = app.Services.GetRequiredService<ISpotifyService>();
+await spotifyService.InitializeAsync();
+
 app.Run();
 

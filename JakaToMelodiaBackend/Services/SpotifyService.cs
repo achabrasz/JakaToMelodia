@@ -10,6 +10,7 @@ public interface ISpotifyService
     Task<string> GetAuthorizationUrl();
     Task<bool> HandleCallback(string code);
     Task<List<Song>> GetPlaylistTracks(string playlistId);
+    Task InitializeAsync();
     bool IsAuthenticated { get; }
 }
 
@@ -36,6 +37,32 @@ public class SpotifyService : ISpotifyService
         _settings = settings.Value;
         _logger = logger;
         _httpClient = httpClientFactory.CreateClient("Spotify");
+
+        // Seed refresh token from config/env so the service is ready without manual OAuth
+        if (!string.IsNullOrEmpty(_settings.RefreshToken))
+        {
+            _refreshToken = _settings.RefreshToken;
+            _logger.LogInformation("Spotify refresh token loaded from configuration");
+        }
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (string.IsNullOrEmpty(_refreshToken))
+        {
+            _logger.LogWarning("No Spotify refresh token configured. Visit /api/spotify/auth to authenticate.");
+            return;
+        }
+
+        try
+        {
+            await GetUserTokenAsync();
+            _logger.LogInformation("Spotify pre-authenticated successfully on startup");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Spotify pre-authentication failed on startup");
+        }
     }
 
     public Task<string> GetAuthorizationUrl()
@@ -127,7 +154,10 @@ public class SpotifyService : ISpotifyService
                 var json = JsonDocument.Parse(body);
                 _accessToken = json.RootElement.GetProperty("access_token").GetString()!;
                 if (json.RootElement.TryGetProperty("refresh_token", out var newRt))
+                {
                     _refreshToken = newRt.GetString();
+                    _logger.LogInformation("Spotify refresh token rotated: {RefreshToken}", _refreshToken);
+                }
                 var expiresIn = json.RootElement.GetProperty("expires_in").GetInt32();
                 _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
                 _logger.LogInformation("Spotify token refreshed successfully");
