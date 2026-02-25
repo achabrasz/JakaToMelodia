@@ -8,27 +8,36 @@ namespace JakaToMelodiaBackend.Controllers;
 public class SpotifyController : ControllerBase
 {
     private readonly ISpotifyService _spotifyService;
+    private readonly IConfiguration _config;
 
-    public SpotifyController(ISpotifyService spotifyService)
+    public SpotifyController(ISpotifyService spotifyService, IConfiguration config)
     {
         _spotifyService = spotifyService;
+        _config = config;
     }
 
     [HttpGet("auth")]
     public async Task<IActionResult> GetAuthUrl()
     {
-        var url = await _spotifyService.GetAuthorizationUrl();
-        return Ok(new { url });
+        try
+        {
+            var url = await _spotifyService.GetAuthorizationUrl();
+            return Ok(new { url });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
     }
 
     [HttpGet("status")]
-    public IActionResult GetStatus([FromServices] IConfiguration config)
+    public IActionResult GetStatus()
     {
-        var redirectUri = config["Spotify:RedirectUri"];
+        var redirectUri = _config["Spotify:RedirectUri"];
         return Ok(new
         {
             authenticated = _spotifyService.IsAuthenticated,
-            redirectUri  // shows what's configured so you can verify it matches the dashboard
+            redirectUri
         });
     }
 
@@ -39,8 +48,11 @@ public class SpotifyController : ControllerBase
         if (!success)
             return BadRequest("Failed to authenticate with Spotify");
 
-        // Redirect back to the frontend — it will detect auth success via /api/spotify/status
-        return Redirect("http://localhost:5173/?spotify=authenticated");
+        // Redirect back to the frontend — read from AllowedOrigins so it works in prod too
+        var frontendUrl = _config["AllowedOrigins"]?.Split(',').FirstOrDefault()?.Trim()
+            ?? "http://localhost:5173";
+
+        return Redirect($"{frontendUrl}/?spotify=authenticated");
     }
 
     [HttpGet("playlist/{playlistId}")]

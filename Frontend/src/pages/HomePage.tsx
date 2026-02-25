@@ -7,6 +7,8 @@ import type { MusicSource } from '../types';
 import { MusicSourceValues } from '../types';
 import './HomePage.css';
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '') + '/api';
+
 export const HomePage = () => {
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
@@ -27,7 +29,7 @@ export const HomePage = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const resp = await fetch('/api/spotify/status');
+        const resp = await fetch(`${API_BASE_URL}/spotify/status`);
         const data = await resp.json();
         setSpotifyAuthed(data.authenticated);
         if (data.redirectUri) setSpotifyRedirectUri(data.redirectUri);
@@ -44,7 +46,7 @@ export const HomePage = () => {
   }, [searchParams]);
 
   const handleSpotifyLogin = async () => {
-    const resp = await fetch('/api/spotify/auth');
+    const resp = await fetch(`${API_BASE_URL}/spotify/auth`);
     const data = await resp.json();
     window.location.href = data.url;
   };
