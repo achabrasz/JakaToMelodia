@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const backendUrl = process.env.VITE_BACKEND_URL ?? 'http://127.0.0.1:8080';
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -10,12 +12,12 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:5000',
+        target: backendUrl,
         changeOrigin: true,
         secure: false,
       },
       '/gameHub': {
-        target: 'http://127.0.0.1:5000',
+        target: backendUrl,
         changeOrigin: true,
         secure: false,
         ws: true,

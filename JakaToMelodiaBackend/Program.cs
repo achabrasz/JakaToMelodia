@@ -2,7 +2,15 @@
 using JakaToMelodiaBackend.Models;
 using JakaToMelodiaBackend.Services;
 
+// Default to Development locally if not explicitly set (e.g. running with plain `dotnet run`)
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")))
+    Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Render sets PORT — fall back to 8080 locally
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -39,6 +47,8 @@ builder.Services.AddSingleton<ISpotifyService, SpotifyService>();
 // Add YouTube service
 builder.Services.AddHttpClient<IYouTubeService, YouTubeService>();
 
+// Pre-authenticate Spotify automatically on startup
+builder.Services.AddHostedService<SpotifyStartupService>();
 
 var app = builder.Build();
 
@@ -56,9 +66,30 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<GameHub>("/gameHub");
 
-// Pre-authenticate Spotify on startup using stored refresh token
-var spotifyService = app.Services.GetRequiredService<ISpotifyService>();
-await spotifyService.InitializeAsync();
-
 app.Run();
 
+// Hosted service — blocks startup until Spotify is authenticated
+public class SpotifyStartupService(
+    ISpotifyService spotifyService,
+    ILogger<SpotifyStartupService> logger,
+    IHostApplicationLifetime lifetime) : IHostedService
+{
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        logger.LogInformation("SpotifyStartupService: pre-authenticating Spotify...");
+        try
+        {
+            await spotifyService.InitializeAsync();
+            if (spotifyService.IsAuthenticated)
+                logger.LogInformation("Spotify pre-authentication successful.");
+            else
+                logger.LogWarning("Spotify not authenticated — set Spotify__RefreshToken env var or visit /api/spotify/auth.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Spotify pre-authentication failed.");
+        }
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+}

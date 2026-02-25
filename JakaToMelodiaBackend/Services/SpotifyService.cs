@@ -1,4 +1,5 @@
 ﻿using JakaToMelodiaBackend.Models;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -20,6 +21,7 @@ public class SpotifyService : ISpotifyService
     private readonly SpotifySettings _settings;
     private readonly ILogger<SpotifyService> _logger;
     private readonly HttpClient _httpClient;
+    private readonly IWebHostEnvironment _env;
 
     // User OAuth token (Authorization Code flow) — required for playlist items endpoint
     private string? _accessToken;
@@ -35,11 +37,12 @@ public class SpotifyService : ISpotifyService
 
     public string? CurrentRefreshToken => _refreshToken;
 
-    public SpotifyService(IOptions<SpotifySettings> settings, ILogger<SpotifyService> logger, IHttpClientFactory httpClientFactory)
+    public SpotifyService(IOptions<SpotifySettings> settings, ILogger<SpotifyService> logger, IHttpClientFactory httpClientFactory, IWebHostEnvironment env)
     {
         _settings = settings.Value;
         _logger = logger;
         _httpClient = httpClientFactory.CreateClient("Spotify");
+        _env = env;
 
         // Seed refresh token from config/env so the service is ready without manual OAuth
         if (!string.IsNullOrEmpty(_settings.RefreshToken))
@@ -119,6 +122,10 @@ public class SpotifyService : ISpotifyService
             _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
 
             _logger.LogInformation("Spotify OAuth authenticated, token expires in {Seconds}s", expiresIn);
+
+            // Persist refresh token to appsettings so it survives restarts
+            await PersistRefreshTokenAsync(_refreshToken);
+
             return true;
         }
         catch (Exception ex)
@@ -160,6 +167,7 @@ public class SpotifyService : ISpotifyService
                 {
                     _refreshToken = newRt.GetString();
                     _logger.LogInformation("Spotify refresh token rotated: {RefreshToken}", _refreshToken);
+                    await PersistRefreshTokenAsync(_refreshToken);
                 }
                 var expiresIn = json.RootElement.GetProperty("expires_in").GetInt32();
                 _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
@@ -172,6 +180,52 @@ public class SpotifyService : ISpotifyService
         }
 
         throw new InvalidOperationException("Brak autoryzacji Spotify. Zaloguj się przez /api/spotify/auth");
+    }
+
+    private async Task PersistRefreshTokenAsync(string? token)
+    {
+        if (string.IsNullOrEmpty(token)) return;
+
+        // Always log prominently so it can be copied into Render env var
+        _logger.LogWarning("=== SPOTIFY REFRESH TOKEN (copy to Spotify__RefreshToken env var) ===");
+        _logger.LogWarning("{Token}", token);
+        _logger.LogWarning("===================================================================");
+
+        // In Development, write directly into appsettings.Development.json so it survives restarts
+        if (!_env.IsDevelopment()) return;
+
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "appsettings.Development.json");
+
+            // Walk up from bin/ to the project root where the real file lives
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                var candidate = Path.Combine(dir.FullName, "appsettings.Development.json");
+                if (File.Exists(candidate)) { path = candidate; break; }
+                dir = dir.Parent;
+            }
+
+            if (!File.Exists(path))
+            {
+                _logger.LogWarning("appsettings.Development.json not found, cannot persist refresh token");
+                return;
+            }
+
+            var raw = await File.ReadAllTextAsync(path);
+            var doc = System.Text.Json.Nodes.JsonNode.Parse(raw)!;
+
+            doc["Spotify"] ??= new System.Text.Json.Nodes.JsonObject();
+            doc["Spotify"]!["RefreshToken"] = token;
+
+            await File.WriteAllTextAsync(path, doc.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            _logger.LogInformation("Refresh token persisted to appsettings.Development.json");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist refresh token to appsettings.Development.json");
+        }
     }
 
     public async Task<List<Song>> GetPlaylistTracks(string playlistId)

@@ -25,24 +25,41 @@ export const HomePage = () => {
   const setCurrentPlayer = useGameStore((s) => s.setCurrentPlayer);
   const setMusicSource = useGameStore((s) => s.setMusicSource);
 
-  // Check Spotify auth status on mount (and after redirect back from Spotify)
+  // Check Spotify auth status on mount, poll until authenticated
   useEffect(() => {
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const checkAuth = async () => {
       try {
         const resp = await fetch(`${API_BASE_URL}/spotify/status`);
         const data = await resp.json();
-        setSpotifyAuthed(data.authenticated);
-        if (data.redirectUri) setSpotifyRedirectUri(data.redirectUri);
+        if (!cancelled) {
+          setSpotifyAuthed(data.authenticated);
+          if (data.redirectUri) setSpotifyRedirectUri(data.redirectUri);
+          // Keep polling until authenticated (backend may still be initializing)
+          if (!data.authenticated) {
+            timeoutId = setTimeout(checkAuth, 2000);
+          }
+        }
       } catch {
-        setSpotifyAuthed(false);
+        if (!cancelled) {
+          setSpotifyAuthed(false);
+          timeoutId = setTimeout(checkAuth, 3000);
+        }
       }
     };
+
     checkAuth();
 
     if (searchParams.get('spotify') === 'authenticated') {
-      // Clean up the URL param
       window.history.replaceState({}, '', '/');
     }
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [searchParams]);
 
   const handleSpotifyLogin = async () => {
@@ -217,9 +234,9 @@ export const HomePage = () => {
         </div>
 
         <div className="spotify-auth">
-          {spotifyAuthed === false && (
+          {selectedMusicSource === MusicSourceValues.Spotify && spotifyAuthed === false && (
             <div className="spotify-auth-container">
-              <span className="spotify-auth-text">Zaloguj się do Spotify, aby używać playlist:</span>
+              <span className="spotify-auth-text">⚠️ Backend Spotify nie jest autoryzowany:</span>
               <button
                 onClick={handleSpotifyLogin}
                 className="button button-spotify"
@@ -233,6 +250,9 @@ export const HomePage = () => {
                 </span>
               )}
             </div>
+          )}
+          {selectedMusicSource === MusicSourceValues.Spotify && spotifyAuthed === true && (
+            <div className="spotify-auth-ok">✅ Spotify połączony</div>
           )}
         </div>
       </div>
