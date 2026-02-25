@@ -138,10 +138,10 @@ public class SpotifyService : ISpotifyService
 
             var offset = 0;
             const int limit = 50;
+            var retried = false;
 
             while (true)
             {
-                // New endpoint: /playlists/{id}/items (replaces deprecated /playlists/{id}/tracks)
                 var url = $"https://api.spotify.com/v1/playlists/{playlistId}/items?limit={limit}&offset={offset}";
                 var req = new HttpRequestMessage(HttpMethod.Get, url);
                 req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -154,17 +154,22 @@ public class SpotifyService : ISpotifyService
                 if (!resp.IsSuccessStatusCode)
                 {
                     _logger.LogError("Spotify API error: status={Status}, body={Body}", resp.StatusCode, body);
-                    if ((int)resp.StatusCode == 401)
+                    if ((int)resp.StatusCode == 401 && !retried)
                     {
-                        _accessToken = null;
-                        throw new InvalidOperationException("Token Spotify wygasł. Zaloguj się ponownie przez /api/spotify/auth");
+                        // CC token expired — force refresh and retry once
+                        _ccToken = null;
+                        token = await GetClientCredentialsTokenAsync();
+                        retried = true;
+                        continue;
                     }
                     if ((int)resp.StatusCode == 403)
-                        throw new InvalidOperationException("Brak dostępu do playlisty. Upewnij się że jest publiczna lub należy do Ciebie.");
+                        throw new InvalidOperationException("Brak dostępu do playlisty. Upewnij się że jest publiczna.");
                     if ((int)resp.StatusCode == 404)
                         throw new InvalidOperationException("Playlista nie została znaleziona.");
                     throw new InvalidOperationException($"Błąd Spotify API: {resp.StatusCode} - {body}");
                 }
+
+                retried = false;
 
                 var page = JsonDocument.Parse(body).RootElement;
 
