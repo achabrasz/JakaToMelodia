@@ -114,5 +114,7 @@ public class MockSpotifyService : ISpotifyService
         return Task.FromResult(mockSongs);
     }
 
-    public bool IsAuthenticated { get; set; }
+    public bool IsAuthenticated { get; set; } = true;
+
+    public Task InitializeAsync() => Task.CompletedTask;
 }
