@@ -115,6 +115,7 @@ public class MockSpotifyService : ISpotifyService
     }
 
     public bool IsAuthenticated { get; set; } = true;
+    public string? CurrentRefreshToken => null;
 
     public Task InitializeAsync() => Task.CompletedTask;
 }

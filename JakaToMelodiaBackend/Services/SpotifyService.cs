@@ -12,6 +12,7 @@ public interface ISpotifyService
     Task<List<Song>> GetPlaylistTracks(string playlistId);
     Task InitializeAsync();
     bool IsAuthenticated { get; }
+    string? CurrentRefreshToken { get; }
 }
 
 public class SpotifyService : ISpotifyService
@@ -31,6 +32,8 @@ public class SpotifyService : ISpotifyService
 
     public bool IsAuthenticated => (_accessToken != null && DateTime.UtcNow < _tokenExpiry)
                                 || _refreshToken != null;
+
+    public string? CurrentRefreshToken => _refreshToken;
 
     public SpotifyService(IOptions<SpotifySettings> settings, ILogger<SpotifyService> logger, IHttpClientFactory httpClientFactory)
     {

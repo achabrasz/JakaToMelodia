@@ -37,7 +37,8 @@ public class SpotifyController : ControllerBase
         return Ok(new
         {
             authenticated = _spotifyService.IsAuthenticated,
-            redirectUri
+            redirectUri,
+            refreshToken = _spotifyService.CurrentRefreshToken // copy this into Spotify__RefreshToken env var on Render
         });
     }
 
